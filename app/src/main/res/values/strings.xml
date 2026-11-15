@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Barrier</string>
+    <string name="accessibility_service_label">Barrier App Blocker</string>
+    <string name="accessibility_service_description">Barrier uses Accessibility Service to monitor foreground apps and enforce session-based blocking rules. No personal data or keystrokes are collected.</string>
+</resources>
