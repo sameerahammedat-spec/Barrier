@@ -22,7 +22,8 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): BarrierDatabase =
         Room.databaseBuilder(context, BarrierDatabase::class.java, BarrierDatabase.DATABASE_NAME)
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            // Room 2.6.1 exposes the no-argument destructive-migration API.
+            .fallbackToDestructiveMigration()
             .build()
 
     @Provides
