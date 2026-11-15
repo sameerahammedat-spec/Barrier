@@ -5,8 +5,7 @@ import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+
 
 enum class SessionStatus { IDLE, ACTIVE, PAUSED, COMPLETED, CANCELLED }
 enum class SessionScheduleType { MANUAL, SCHEDULED, RECURRING }
@@ -28,16 +27,6 @@ class StringListConverter {
     fun toString(list: List<String>): String = list.joinToString("|")
 }
 
-class BreakSettingsConverter {
-    private val json = Json { ignoreUnknownKeys = true }
-    @TypeConverter
-    fun fromString(value: String): SessionBreakSettings =
-        runCatching { json.decodeFromString<SessionBreakSettings>(value) }
-            .getOrDefault(SessionBreakSettings())
-    @TypeConverter
-    fun toString(settings: SessionBreakSettings): String =
-        json.encodeToString(settings)
-}
 
 @Entity(tableName = "sessions")
 @TypeConverters(StringListConverter::class, BreakSettingsConverter::class)
