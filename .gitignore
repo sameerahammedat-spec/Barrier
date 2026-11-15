@@ -13,3 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Kotlin/Gradle generated state and local diagnostic output
+.kotlin/
+**/build/
+*.log
