@@ -25,6 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rushgames.barrier.ui.theme.BarrierGreen
 import com.rushgames.barrier.ui.theme.BarrierPurple
+import androidx.compose.foundation.BorderStroke
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -168,7 +169,7 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .height(50.dp),
                         shape = RoundedCornerShape(12.dp),
-                        border = ButtonDefaults.outlinedToolboxBorder(enabled = true)
+                        border = BorderStroke(1.dp, BarrierGreen)
                     ) {
                         Text("Sign in with Google", color = Color.White, fontWeight = FontWeight.SemiBold)
                     }

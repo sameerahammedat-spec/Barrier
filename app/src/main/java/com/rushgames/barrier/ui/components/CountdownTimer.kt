@@ -1,8 +1,14 @@
+
 package com.rushgames.barrier.ui.components
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -27,20 +33,34 @@ fun SessionCountdownTimer(
     size: Dp = 160.dp,
     strokeWidth: Dp = 8.dp,
     activeColor: Color = BarrierGreen,
-    trackColor: Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+    trackColor: Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+    onFinish: () -> Unit = {}
 ) {
-    var remainingMs by remember { mutableLongStateOf(maxOf(0, endTimeMs - System.currentTimeMillis())) }
+    var remainingMs by remember(endTimeMs) {
+        mutableLongStateOf(maxOf(0L, endTimeMs - System.currentTimeMillis()))
+    }
+
+    val currentOnFinish by rememberUpdatedState(onFinish)
 
     LaunchedEffect(endTimeMs) {
-        while (remainingMs > 0) {
-            delay(1000)
-            remainingMs = maxOf(0, endTimeMs - System.currentTimeMillis())
+        while (true) {
+            val remaining = maxOf(0L, endTimeMs - System.currentTimeMillis())
+            remainingMs = remaining
+
+            if (remaining <= 0L) {
+                currentOnFinish()
+                break
+            }
+
+            delay(1000L)
         }
     }
 
-    val progress = if (totalDurationMs > 0) {
+    val progress = if (totalDurationMs > 0L) {
         (remainingMs.toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f)
-    } else 0f
+    } else {
+        0f
+    }
 
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
@@ -48,9 +68,10 @@ fun SessionCountdownTimer(
         label = "countdown"
     )
 
-    val hours = (remainingMs / 3_600_000).toInt()
-    val minutes = ((remainingMs % 3_600_000) / 60_000).toInt()
-    val seconds = ((remainingMs % 60_000) / 1_000).toInt()
+    val hours = (remainingMs / 3_600_000L).toInt()
+    val minutes = ((remainingMs % 3_600_000L) / 60_000L).toInt()
+    val seconds = ((remainingMs % 60_000L) / 1_000L).toInt()
+
     val timeText = if (hours > 0) {
         "%d:%02d:%02d".format(hours, minutes, seconds)
     } else {
@@ -64,10 +85,12 @@ fun SessionCountdownTimer(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val strokePx = strokeWidth.toPx()
             val diameter = this.size.minDimension - strokePx
-            val topLeft = Offset((this.size.width - diameter) / 2, (this.size.height - diameter) / 2)
+            val topLeft = Offset(
+                (this.size.width - diameter) / 2,
+                (this.size.height - diameter) / 2
+            )
             val arcSize = Size(diameter, diameter)
 
-            // Track
             drawArc(
                 color = trackColor,
                 startAngle = -90f,
@@ -77,7 +100,7 @@ fun SessionCountdownTimer(
                 size = arcSize,
                 style = Stroke(strokePx, cap = StrokeCap.Round)
             )
-            // Progress
+
             drawArc(
                 color = activeColor,
                 startAngle = -90f,
@@ -88,6 +111,7 @@ fun SessionCountdownTimer(
                 style = Stroke(strokePx, cap = StrokeCap.Round)
             )
         }
+
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = timeText,
@@ -96,6 +120,7 @@ fun SessionCountdownTimer(
                 ),
                 color = MaterialTheme.colorScheme.onSurface
             )
+
             Text(
                 text = "remaining",
                 style = MaterialTheme.typography.labelSmall,

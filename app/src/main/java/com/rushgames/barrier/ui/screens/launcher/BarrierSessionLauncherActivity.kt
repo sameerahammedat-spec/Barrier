@@ -37,7 +37,7 @@ import com.rushgames.barrier.data.model.AppInfo
 import com.rushgames.barrier.data.model.Session
 import com.rushgames.barrier.data.repository.AppRepository
 import com.rushgames.barrier.data.repository.SessionRepository
-import com.rushgames.barrier.ui.components.CountdownTimer
+import com.rushgames.barrier.ui.components.SessionCountdownTimer
 import com.rushgames.barrier.ui.theme.BarrierTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -162,16 +162,17 @@ fun SessionLauncherContent(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    activeSession?.let { session ->
-                        CountdownTimer(
-                            endTimeMs = session.endTime,
-                            onFinish = {
-                                scope.launch {
-                                    sessionRepository.completeSession(session.id)
-                                }
-                            }
-                        )
-                    }
+                 activeSession?.let { session ->
+    SessionCountdownTimer(
+        endTimeMs = session.endTime,
+        totalDurationMs = session.durationMinutes * 60_000L,
+        onFinish = {
+            scope.launch {
+                sessionRepository.completeSession(session.id)
+            }
+        }
+    )
+}
 
                     Spacer(modifier = Modifier.height(12.dp))
 
