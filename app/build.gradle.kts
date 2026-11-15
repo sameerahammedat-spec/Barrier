@@ -1,4 +1,3 @@
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -19,7 +18,6 @@ android {
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled = true
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -42,13 +40,11 @@ android {
         compose = true
     }
 
-    // Room schema export
     ksp {
         arg("room.schemaLocation", "$projectDir/schemas")
     }
 }
 
-// Kotlin JVM configuration — outside android {}
 kotlin {
     jvmToolchain(21)
 }
@@ -68,6 +64,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.runtime)
     implementation(libs.coil.compose)
@@ -76,7 +73,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
-
 
     // Hilt DI
     implementation(libs.hilt.android)
@@ -88,22 +84,18 @@ dependencies {
     // WorkManager
     implementation(libs.work.runtime.ktx)
 
-    // Unit tests
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 
-    // Instrumentation tests
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.runner)
 
-    // Debug tools
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // KSP processors
     ksp(libs.androidx.room.compiler)
     ksp(libs.moshi.kotlin.codegen)
 }
