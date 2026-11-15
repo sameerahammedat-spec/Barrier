@@ -99,7 +99,7 @@
         <!-- Accessibility Service -->
         <service
             android:name=".service.BarrierAccessibilityService"
-            android:enabled="false"
+            android:enabled="true"
             android:exported="true"
             android:label="@string/accessibility_service_label"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
@@ -127,7 +127,6 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 
