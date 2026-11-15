@@ -5,6 +5,8 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(val route: String) {
+    object Login : Screen("login")
+    object Signup : Screen("signup")
     object Today : Screen("today")
     object Sessions : Screen("sessions")
     object Blocklists : Screen("blocklists")

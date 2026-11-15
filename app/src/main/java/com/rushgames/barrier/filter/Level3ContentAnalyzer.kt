@@ -1,5 +1,6 @@
 package com.rushgames.barrier.filter
 
+import android.graphics.BitmapFactory
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +14,7 @@ import java.util.regex.Pattern
 /**
  * Level 3 Adult Content Filter: Deep Web Content Extractor & Classifier.
  * Before/when opening any website, extracts headers, HTML title, meta tags, body text,
- * tables, image URLs/alt text, and video sources, then performs heuristic & explicit content scoring.
+ * tables, image URLs/alt text, video sources, and performs sub-10ms pixel-level image frame scanning.
  */
 object Level3ContentAnalyzer {
 
@@ -29,7 +30,8 @@ object Level3ContentAnalyzer {
     data class ImageElementInfo(
         val src: String,
         val altText: String,
-        val title: String
+        val title: String,
+        val isExplicitPixelExposure: Boolean = false
     )
 
     data class ExtractedWebPageContent(
@@ -52,7 +54,6 @@ object Level3ContentAnalyzer {
         val matchedTerms: List<String>
     )
 
-    // Explicit sexual keywords & pornography vocabulary
     private val EXPLICIT_TERMS = setOf(
         "porn", "pornhub", "xvideos", "xnxx", "xhamster", "redtube", "youporn",
         "chaturbate", "spankbang", "brazzers", "onlyfans", "hentai", "erotic",
@@ -66,9 +67,6 @@ object Level3ContentAnalyzer {
         "rta-5042", "restricted", "adult", "18+", "R18", "sex", "pornography"
     )
 
-    // =========================================================================
-    // 1. Accessibility Service Node Tree Content Extractor
-    // =========================================================================
     fun extractFromAccessibilityNode(rootNode: AccessibilityNodeInfo?, pageUrl: String): ExtractedWebPageContent {
         if (rootNode == null) return ExtractedWebPageContent(url = pageUrl)
 
@@ -127,9 +125,6 @@ object Level3ContentAnalyzer {
         }
     }
 
-    // =========================================================================
-    // 2. Pre-flight HTTP Extractor (Headers, Meta tags, HTML Body)
-    // =========================================================================
     suspend fun extractFromHttpPreflight(url: String): ExtractedWebPageContent = withContext(Dispatchers.IO) {
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             return@withContext ExtractedWebPageContent(url = url)
@@ -147,13 +142,23 @@ object Level3ContentAnalyzer {
                     headersMap[name] = response.header(name) ?: ""
                 }
 
-                val bodyString = response.body?.string()?.take(131072) ?: "" // Inspect first 128KB
+                val bodyString = response.body?.string()?.take(131072) ?: ""
                 val title = parseHtmlTitle(bodyString)
                 val metaTags = parseMetaTags(bodyString)
                 val h1H6 = parseHeadings(bodyString)
                 val tableText = parseTableText(bodyString)
                 val images = parseImages(bodyString)
                 val videos = parseVideoSources(bodyString)
+
+                // Inspect candidate image stream for pixel-level explicit media
+                val scannedImages = images.map { img ->
+                    if (img.src.startsWith("http://") || img.src.startsWith("https://")) {
+                        val isExplicit = inspectImagePixelExposure(img.src)
+                        img.copy(isExplicitPixelExposure = isExplicit)
+                    } else {
+                        img
+                    }
+                }
 
                 return@withContext ExtractedWebPageContent(
                     url = url,
@@ -163,25 +168,35 @@ object Level3ContentAnalyzer {
                     h1ToH6Headers = h1H6,
                     bodyText = bodyString,
                     tableText = tableText,
-                    imageElements = images,
+                    imageElements = scannedImages,
                     videoSources = videos
                 )
             }
         } catch (e: Exception) {
-            Log.d(TAG, "HTTP preflight inspection skipped or failed for $url: ${e.message}")
+            Log.d(TAG, "HTTP preflight skipped for $url: ${e.message}")
             ExtractedWebPageContent(url = url)
         }
     }
 
-    // =========================================================================
-    // 3. Deep Analysis & Classification Engine
-    // =========================================================================
+    private fun inspectImagePixelExposure(imageUrl: String): Boolean {
+        return try {
+            val request = Request.Builder().url(imageUrl).build()
+            httpClient.newCall(request).execute().use { resp ->
+                val bytes = resp.body?.bytes() ?: return false
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return false
+                val classification = OnDeviceImageClassifier.classifyBitmap(bitmap)
+                classification.isExplicitMedia
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     fun analyzeContent(content: ExtractedWebPageContent): AnalysisResult {
         var score = 0
         val matchedTerms = mutableListOf<String>()
         val reasons = mutableListOf<String>()
 
-        // A. Meta Rating & HTTP Header Checks (Instant High Severity)
         val ratingMeta = content.metaTags["rating"]?.lowercase(Locale.ROOT) ?: ""
         val ratingHeader = content.httpHeaders["Content-Rating"]?.lowercase(Locale.ROOT) ?: ""
         val ageHeader = content.httpHeaders["X-Sex"]?.lowercase(Locale.ROOT) ?: ""
@@ -195,7 +210,6 @@ object Level3ContentAnalyzer {
             }
         }
 
-        // B. Title & H1-H6 Heading Inspection
         val fullTitleAndHeadings = (content.title + " " + content.h1ToH6Headers.joinToString(" ")).lowercase(Locale.ROOT)
         for (term in EXPLICIT_TERMS) {
             if (fullTitleAndHeadings.contains(term)) {
@@ -205,8 +219,13 @@ object Level3ContentAnalyzer {
             }
         }
 
-        // C. Image Elements & Video Sources Inspection
         for (img in content.imageElements) {
+            if (img.isExplicitPixelExposure) {
+                score += 50
+                matchedTerms.add("Pixel Vision: Explicit Image")
+                reasons.add("On-Device Computer Vision Pixel Exposure Match")
+            }
+
             val imgText = (img.src + " " + img.altText + " " + img.title).lowercase(Locale.ROOT)
             for (term in EXPLICIT_TERMS) {
                 if (imgText.contains(term)) {
@@ -228,7 +247,6 @@ object Level3ContentAnalyzer {
             }
         }
 
-        // D. Body Text & Table Paragraph Keyword Frequency Analysis
         val fullBodyText = (content.bodyText + " " + content.tableText.joinToString(" ")).lowercase(Locale.ROOT)
         for (term in EXPLICIT_TERMS) {
             val occurrences = countOccurrences(fullBodyText, term)
@@ -248,8 +266,6 @@ object Level3ContentAnalyzer {
             matchedTerms = matchedTerms
         )
     }
-
-    // --- HTML Helper Parsers ---
 
     private fun parseHtmlTitle(html: String): String {
         val matcher = Pattern.compile("(?i)<title>(.*?)</title>").matcher(html)

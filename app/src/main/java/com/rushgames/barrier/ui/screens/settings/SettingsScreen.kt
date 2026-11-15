@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -18,14 +19,17 @@ import com.rushgames.barrier.ui.components.BarrierSectionHeader
 import com.rushgames.barrier.ui.theme.BarrierGreen
 import com.rushgames.barrier.ui.theme.BarrierPurple
 import com.rushgames.barrier.ui.theme.BarrierRed
+import com.rushgames.barrier.util.DeviceAdminManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onNavigatePermissions: () -> Unit,
     onNavigateProtection: () -> Unit,
+    onNavigateAuth: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showThemeDialog by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
@@ -41,6 +45,51 @@ fun SettingsScreen(
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
         Text("Customize Barrier", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(28.dp))
+
+        // === User Account & Cloud Sync Banner ===
+        BarrierSectionHeader("Account & Cloud Backup")
+        Spacer(Modifier.height(8.dp))
+        SettingsCard {
+            val user = uiState.currentUser
+            if (user != null) {
+                SettingsNavigationRow(
+                    icon = Icons.Outlined.AccountCircle,
+                    iconTint = BarrierGreen,
+                    title = if (user.isGuest) "Guest Account (Offline)" else user.displayName,
+                    description = if (user.isGuest) "Tap to sign in & enable cloud sync" else user.email,
+                    onClick = {
+                        if (user.isGuest) onNavigateAuth()
+                        else viewModel.syncCloudData()
+                    }
+                )
+                SettingsDivider()
+                SettingsNavigationRow(
+                    icon = Icons.Outlined.CloudSync,
+                    iconTint = BarrierPurple,
+                    title = "Sync Data to Cloud",
+                    description = uiState.syncMessage ?: "Backup blocklists and focus stats",
+                    onClick = { viewModel.syncCloudData() }
+                )
+                SettingsDivider()
+                SettingsNavigationRow(
+                    icon = Icons.Outlined.Logout,
+                    iconTint = BarrierRed,
+                    title = "Sign Out",
+                    description = "Disconnect current account session",
+                    onClick = { viewModel.signOut() }
+                )
+            } else {
+                SettingsNavigationRow(
+                    icon = Icons.Outlined.Login,
+                    iconTint = BarrierGreen,
+                    title = "Sign In / Sign Up",
+                    description = "Sync your focus blocklists across devices",
+                    onClick = onNavigateAuth
+                )
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
 
         // === Protection Center Banner Row ===
         SettingsCard {
@@ -150,8 +199,8 @@ fun SettingsScreen(
                 icon = Icons.Outlined.AdminPanelSettings,
                 iconTint = BarrierRed,
                 title = "Device Administrator",
-                description = "Advanced management mode",
-                onClick = { }
+                description = if (DeviceAdminManager.isDeviceAdminActive(context)) "Enabled (Anti-Uninstall Active)" else "Tap to enable anti-uninstall protection",
+                onClick = { DeviceAdminManager.openDeviceAdminSettings(context) }
             )
         }
 

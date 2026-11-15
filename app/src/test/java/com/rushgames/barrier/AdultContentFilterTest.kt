@@ -1,9 +1,11 @@
 package com.rushgames.barrier
 
+import android.graphics.Bitmap
 import com.rushgames.barrier.filter.AdultContentFilter
 import com.rushgames.barrier.filter.Level1UrlFilter
 import com.rushgames.barrier.filter.Level2DatabaseFilter
 import com.rushgames.barrier.filter.Level3ContentAnalyzer
+import com.rushgames.barrier.filter.OnDeviceImageClassifier
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

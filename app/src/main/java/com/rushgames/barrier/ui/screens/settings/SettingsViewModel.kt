@@ -3,6 +3,9 @@ package com.rushgames.barrier.ui.screens.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rushgames.barrier.data.datastore.BarrierPreferences
+import com.rushgames.barrier.data.model.User
+import com.rushgames.barrier.data.repository.AuthRepository
+import com.rushgames.barrier.data.repository.CloudSyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -13,12 +16,16 @@ data class SettingsUiState(
     val strictModeGlobal: Boolean = false,
     val adultProtection: Boolean = false,
     val notificationsEnabled: Boolean = true,
-    val recoveryPin: String = ""
+    val recoveryPin: String = "",
+    val currentUser: User? = null,
+    val syncMessage: String? = null
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val prefs: BarrierPreferences
+    private val prefs: BarrierPreferences,
+    private val authRepository: AuthRepository,
+    private val cloudSyncRepository: CloudSyncRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -30,13 +37,15 @@ class SettingsViewModel @Inject constructor(
                 prefs.theme,
                 prefs.strictModeGlobal,
                 prefs.adultProtection,
-                prefs.recoveryPin
-            ) { theme, strict, adult, pin ->
+                prefs.recoveryPin,
+                authRepository.currentUser
+            ) { theme, strict, adult, pin, user ->
                 SettingsUiState(
                     theme = theme,
                     strictModeGlobal = strict,
                     adultProtection = adult,
-                    recoveryPin = pin
+                    recoveryPin = pin,
+                    currentUser = user
                 )
             }.collect { _uiState.value = it }
         }
@@ -46,4 +55,18 @@ class SettingsViewModel @Inject constructor(
     fun toggleStrictMode() = viewModelScope.launch { prefs.setStrictModeGlobal(!_uiState.value.strictModeGlobal) }
     fun toggleAdultProtection() = viewModelScope.launch { prefs.setAdultProtection(!_uiState.value.adultProtection) }
     fun setRecoveryPin(pin: String) = viewModelScope.launch { prefs.setRecoveryPin(pin) }
+
+    fun syncCloudData() {
+        val user = _uiState.value.currentUser ?: return
+        viewModelScope.launch {
+            val res = cloudSyncRepository.syncUserDataToCloud(user.id)
+            _uiState.update { it.copy(syncMessage = res.message) }
+        }
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            authRepository.signOut()
+        }
+    }
 }

@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.rushgames.barrier.data.dao.BlocklistDao
 import com.rushgames.barrier.data.dao.SessionDao
 import com.rushgames.barrier.data.dao.StatsDao
+import com.rushgames.barrier.data.dao.UsageLimitDao
 import com.rushgames.barrier.data.database.BarrierDatabase
 import dagger.Module
 import dagger.Provides
@@ -32,4 +33,7 @@ object DatabaseModule {
 
     @Provides
     fun provideStatsDao(db: BarrierDatabase): StatsDao = db.statsDao()
+
+    @Provides
+    fun provideUsageLimitDao(db: BarrierDatabase): UsageLimitDao = db.usageLimitDao()
 }

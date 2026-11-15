@@ -7,6 +7,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.rushgames.barrier.ui.screens.auth.LoginScreen
+import com.rushgames.barrier.ui.screens.auth.SignupScreen
 import com.rushgames.barrier.ui.screens.blocklists.BlocklistDetailScreen
 import com.rushgames.barrier.ui.screens.blocklists.BlocklistsScreen
 import com.rushgames.barrier.ui.screens.blocklists.CreateBlocklistScreen
@@ -22,13 +24,38 @@ import com.rushgames.barrier.ui.screens.today.TodayScreen
 @Composable
 fun BarrierNavHost(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    startDestination: String = Screen.Today.route
 ) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Today.route,
+        startDestination = startDestination,
         modifier = modifier
     ) {
+        composable(Screen.Login.route) {
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate(Screen.Today.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                },
+                onNavigateSignup = {
+                    navController.navigate(Screen.Signup.route)
+                }
+            )
+        }
+        composable(Screen.Signup.route) {
+            SignupScreen(
+                onSignupSuccess = {
+                    navController.navigate(Screen.Today.route) {
+                        popUpTo(Screen.Signup.route) { inclusive = true }
+                    }
+                },
+                onNavigateLogin = {
+                    navController.popBackStack()
+                }
+            )
+        }
         composable(Screen.Today.route) {
             TodayScreen(
                 onStartSession = { navController.navigate(Screen.CreateSession.route) },
@@ -85,7 +112,8 @@ fun BarrierNavHost(
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onNavigatePermissions = { navController.navigate(Screen.PermissionsSetup.route) },
-                onNavigateProtection = { navController.navigate(Screen.ProtectionCenter.route) }
+                onNavigateProtection = { navController.navigate(Screen.ProtectionCenter.route) },
+                onNavigateAuth = { navController.navigate(Screen.Login.route) }
             )
         }
         composable(Screen.PermissionsSetup.route) {
