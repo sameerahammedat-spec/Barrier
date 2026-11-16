@@ -35,10 +35,10 @@ object Level1UrlFilter {
     fun checkUrlOrDomain(rawInput: String): Level1Result {
         if (rawInput.isBlank()) return Level1Result(false)
 
-        val decodedInput = decodeUrl(rawInput).lowercase(Locale.ROOT).trim()
+        val normalizedInput = rawInput.trim()
 
-        // Extract host / domain
-        val domain = extractDomain(decodedInput)
+        // Parse the host before decoding query values; decoding the full URL can corrupt its authority.
+        val domain = extractDomain(normalizedInput)
 
         // 1. TLD Check
         val tld = domain.substringAfterLast('.', "")
@@ -48,14 +48,14 @@ object Level1UrlFilter {
 
         // 2. Keyword matching in Domain/Subdomain
         for (keyword in ADULT_URL_KEYWORDS) {
-            if (domain.contains(keyword)) {
+            if (containsDomainKeyword(domain, keyword)) {
                 return Level1Result(true, "Blocked by URL/Domain keyword ($keyword)")
             }
         }
 
         // 3. Search Engine Query Inspection (Google, Bing, DuckDuckGo, YouTube, etc.)
-        if (isSearchQuery(decodedInput)) {
-            val queryText = extractSearchQueryText(decodedInput)
+        if (isSearchQuery(normalizedInput)) {
+            val queryText = extractSearchQueryText(normalizedInput)
             for (term in ADULT_SEARCH_TERMS) {
                 if (queryText.contains(term)) {
                     return Level1Result(true, "Blocked by Explicit Search Term ($term)")
@@ -63,12 +63,14 @@ object Level1UrlFilter {
             }
         }
 
-        // 4. Path & Query String Inspection for raw URLs
-        if (decodedInput.contains("/") || decodedInput.contains("?")) {
-            for (keyword in ADULT_URL_KEYWORDS) {
-                if (decodedInput.contains("/$keyword") || decodedInput.contains("=$keyword") || decodedInput.contains("_$keyword")) {
-                    return Level1Result(true, "Blocked by URL path/query pattern ($keyword)")
-                }
+        // 4. Inspect path segments only. Arbitrary query parameters are not search queries.
+        val decodedPath = extractUrlPath(normalizedInput)
+        val pathTokens = decodedPath.lowercase(Locale.ROOT)
+            .split(Regex("[^a-z0-9]+"))
+            .filter(String::isNotEmpty)
+        for (keyword in ADULT_URL_KEYWORDS) {
+            if (keyword in pathTokens) {
+                return Level1Result(true, "Blocked by URL path pattern ($keyword)")
             }
         }
 
@@ -87,25 +89,30 @@ object Level1UrlFilter {
         }
     }
 
-    fun extractDomain(urlOrDomain: String): String {
-        val clean = urlOrDomain.trim().lowercase(Locale.ROOT)
-        val withoutProtocol = when {
-            clean.startsWith("http://") -> clean.substring(7)
-            clean.startsWith("https://") -> clean.substring(8)
-            else -> clean
-        }
-        val domainPart = withoutProtocol.split('/', '?', '#', ':')[0]
-        return domainPart.removePrefix("www.")
+    fun extractDomain(urlOrDomain: String): String =
+        WebsiteDomainMatcher.normalizeDomain(urlOrDomain).orEmpty()
+
+    private fun extractUrlPath(input: String): String {
+        val uri = runCatching { java.net.URI(if (input.contains("://")) input else "https://$input") }
+            .getOrNull()
+        return decodeUrl(uri?.rawPath.orEmpty())
     }
 
     private fun isSearchQuery(url: String): Boolean {
-        return url.contains("google.com/search") ||
-                url.contains("bing.com/search") ||
-                url.contains("duckduckgo.com/") ||
-                url.contains("search.yahoo.com/") ||
-                url.contains("yandex.com/search") ||
-                url.contains("youtube.com/results")
+        val host = extractDomain(url)
+        return host == "google.com" || host.endsWith(".google.com") ||
+            host == "bing.com" || host.endsWith(".bing.com") ||
+            host == "duckduckgo.com" || host.endsWith(".duckduckgo.com") ||
+            host == "search.yahoo.com" || host.endsWith(".search.yahoo.com") ||
+            host == "yandex.com" || host.endsWith(".yandex.com") ||
+            host == "youtube.com" || host.endsWith(".youtube.com") ||
+            host == "youtu.be" || host.endsWith(".youtu.be")
     }
+
+    private fun containsDomainKeyword(domain: String, keyword: String): Boolean =
+        domain.split('.').any { label ->
+            label.split(Regex("[^a-z0-9]+")).contains(keyword)
+        }
 
     private fun extractSearchQueryText(url: String): String {
         val queryParameters = url.substringAfter('?', "").substringBefore('#').split('&')

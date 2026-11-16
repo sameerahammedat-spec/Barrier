@@ -15,6 +15,7 @@ import com.rushgames.barrier.data.repository.BlocklistRepository
 import com.rushgames.barrier.data.repository.SessionRepository
 import com.rushgames.barrier.filter.AdultContentFilter
 import com.rushgames.barrier.filter.Level1UrlFilter
+import com.rushgames.barrier.filter.WebsiteDomainMatcher
 import com.rushgames.barrier.ui.screens.restriction.RestrictionActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +23,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.util.Locale
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -184,7 +184,7 @@ class BarrierAccessibilityService : AccessibilityService() {
 
             // Session Blocked Websites Check
             if (activeSession.websiteFilterMode == WebsiteFilterMode.BLOCKLIST || activeSession.websiteFilterMode == WebsiteFilterMode.COMBINED) {
-                if (activeSession.blockedWebsites.any { cleanDomain.contains(it.lowercase(Locale.ROOT)) }) {
+                if (WebsiteDomainMatcher.matchesAny(cleanDomain, activeSession.blockedWebsites)) {
                     blockWebsite(cleanDomain, "Blocked Website List ('${activeSession.name}')", activeSession.id, packageName)
                     return@launch
                 }
@@ -193,7 +193,7 @@ class BarrierAccessibilityService : AccessibilityService() {
             // Session Allowlist Check
             if (activeSession.websiteFilterMode == WebsiteFilterMode.ALLOWLIST_ONLY || activeSession.websiteFilterMode == WebsiteFilterMode.COMBINED) {
                 if (activeSession.allowedWebsites.isNotEmpty()) {
-                    val isAllowed = activeSession.allowedWebsites.any { cleanDomain.endsWith(it.lowercase(Locale.ROOT)) }
+                    val isAllowed = WebsiteDomainMatcher.matchesAny(cleanDomain, activeSession.allowedWebsites)
                     if (!isAllowed) {
                         blockWebsite(cleanDomain, "Website Allowlist Mode ('${activeSession.name}')", activeSession.id, packageName)
                         return@launch

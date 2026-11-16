@@ -42,10 +42,24 @@ class AdultContentFilterTest {
     }
 
     @Test
+    fun testLevel1UrlMatching_KeywordSubstringsAndLookalikeSearchHosts_AreNotBlocked() {
+        assertFalse(Level1UrlFilter.checkUrlOrDomain("https://essex.gov.uk/services").isBlocked)
+        assertFalse(Level1UrlFilter.checkUrlOrDomain("https://google.com.attacker.test/search?q=porn").isBlocked)
+    }
+
+    @Test
+    fun testLevel1UrlMatching_EncodedSearchQuery_IsBlocked() {
+        val result = Level1UrlFilter.checkUrlOrDomain("https://www.google.com/search?q=free%20porn")
+        assertTrue(result.isBlocked)
+        assertTrue(result.reason.contains("Search Term"))
+    }
+
+    @Test
     fun testLevel2Database_KnownAdultDomain_Blocked() {
         val l2 = Level2DatabaseFilter()
-        val res = l2.isDomainInDatabase("subdomain.xvideos.com")
-        assertTrue(res.isBlocked)
+        assertTrue(l2.isDomainInDatabase("subdomain.xvideos.com").isBlocked)
+        assertFalse(l2.isDomainInDatabase("notxvideos.com").isBlocked)
+        assertFalse(l2.isDomainInDatabase("xvideos.com.attacker.test").isBlocked)
     }
 
     @Test

@@ -93,10 +93,10 @@ class CreateSessionViewModel @Inject constructor(
 
     fun addAllowedWebsite(domain: String) {
         if (domain.isBlank()) return
+        val cleanDomain = com.rushgames.barrier.filter.WebsiteDomainMatcher.normalizeDomain(domain) ?: return
         _uiState.update { state ->
-            val clean = domain.trim().lowercase().removePrefix("https://").removePrefix("http://")
             val current = state.allowedWebsites.toMutableList()
-            if (!current.contains(clean)) current.add(clean)
+            if (!current.contains(cleanDomain)) current.add(cleanDomain)
             state.copy(allowedWebsites = current)
         }
     }
