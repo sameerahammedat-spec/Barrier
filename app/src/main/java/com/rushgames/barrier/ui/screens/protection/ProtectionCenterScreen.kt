@@ -1,7 +1,5 @@
 package com.rushgames.barrier.ui.screens.protection
 
-import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,11 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.rushgames.barrier.service.BarrierVpnService
 
 enum class ProtectionProfile(val title: String, val description: String) {
     BASIC("Basic Protection", "Blocks known adult sites via Level 1 URL matching."),
@@ -41,8 +37,6 @@ enum class ProtectionProfile(val title: String, val description: String) {
 fun ProtectionCenterScreen(
     onBack: () -> Unit
 ) {
-    val context = LocalContext.current
-
     var selectedProfile by remember { mutableStateOf(ProtectionProfile.STRICT) }
     var adultBlockingEnabled by remember { mutableStateOf(true) }
     var level3DeepScanEnabled by remember { mutableStateOf(true) }
@@ -230,16 +224,10 @@ fun ProtectionCenterScreen(
             item {
                 ProtectionToggleCard(
                     title = "Local VPN DNS Filter",
-                    subtitle = "Runs high-speed local TUN interface for instant domain blocking.",
+                    subtitle = "Unavailable: DNS forwarding is not implemented, so filtering is disabled to protect connectivity.",
                     icon = Icons.Default.VpnKey,
                     checked = vpnDnsFilterEnabled,
-                    onCheckedChange = { enabled ->
-                        vpnDnsFilterEnabled = enabled
-                        val intent = Intent(context, BarrierVpnService::class.java).apply {
-                            action = if (enabled) BarrierVpnService.ACTION_START_VPN else BarrierVpnService.ACTION_STOP_VPN
-                        }
-                        if (enabled) context.startService(intent) else context.startService(intent)
-                    }
+                    onCheckedChange = { vpnDnsFilterEnabled = false }
                 )
             }
 

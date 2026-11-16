@@ -1,6 +1,5 @@
 package com.rushgames.barrier.filter
 
-import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -13,8 +12,6 @@ import kotlinx.coroutines.withContext
  * Level 3: Deep Web Content Extractor & Analyzer (Extracts headers, body text, tables, images, video streams & scores adult density before opening/rendering)
  */
 object AdultContentFilter {
-
-    private const val TAG = "AdultContentFilter"
 
     val SAFESEARCH_GOOGLE_IP = "216.239.38.120"
     val RESTRICTED_YOUTUBE_IP = "216.239.38.119"
@@ -36,7 +33,6 @@ object AdultContentFilter {
         // Level 1: URL & Domain Matching
         val l1Result = Level1UrlFilter.checkUrlOrDomain(urlOrDomain)
         if (l1Result.isBlocked) {
-            Log.d(TAG, "Level 1 URL Filter blocked: $urlOrDomain -> ${l1Result.reason}")
             return ContentFilterEvaluation(
                 isAdult = true,
                 levelTriggered = 1,
@@ -49,7 +45,6 @@ object AdultContentFilter {
         val domain = Level1UrlFilter.extractDomain(urlOrDomain)
         val l2Result = level2DatabaseFilter.isDomainInDatabase(domain, customDatabaseDomains)
         if (l2Result.isBlocked) {
-            Log.d(TAG, "Level 2 Database Filter blocked: $urlOrDomain -> ${l2Result.reason}")
             return ContentFilterEvaluation(
                 isAdult = true,
                 levelTriggered = 2,
@@ -84,7 +79,6 @@ object AdultContentFilter {
             val nodeContent = Level3ContentAnalyzer.extractFromAccessibilityNode(rootNode, urlOrDomain)
             val nodeAnalysis = Level3ContentAnalyzer.analyzeContent(nodeContent)
             if (nodeAnalysis.isAdultContent) {
-                Log.d(TAG, "Level 3 Accessibility Node Analyzer blocked: $urlOrDomain -> ${nodeAnalysis.reason}")
                 return@withContext ContentFilterEvaluation(
                     isAdult = true,
                     levelTriggered = 3,
@@ -99,7 +93,6 @@ object AdultContentFilter {
             val httpContent = Level3ContentAnalyzer.extractFromHttpPreflight(urlOrDomain)
             val httpAnalysis = Level3ContentAnalyzer.analyzeContent(httpContent)
             if (httpAnalysis.isAdultContent) {
-                Log.d(TAG, "Level 3 HTTP Preflight Analyzer blocked: $urlOrDomain -> ${httpAnalysis.reason}")
                 return@withContext ContentFilterEvaluation(
                     isAdult = true,
                     levelTriggered = 3,

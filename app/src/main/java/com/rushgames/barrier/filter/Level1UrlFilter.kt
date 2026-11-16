@@ -1,6 +1,5 @@
 package com.rushgames.barrier.filter
 
-import android.net.Uri
 import java.net.URLDecoder
 import java.util.Locale
 
@@ -44,7 +43,7 @@ object Level1UrlFilter {
         // 1. TLD Check
         val tld = domain.substringAfterLast('.', "")
         if (ADULT_TLDS.contains(tld)) {
-            return Level1Result(true, "Blocked by Adult Top-Level Domain (.$tld)")
+            return Level1Result(true, "Blocked by Adult TLD (.$tld)")
         }
 
         // 2. Keyword matching in Domain/Subdomain
@@ -109,15 +108,16 @@ object Level1UrlFilter {
     }
 
     private fun extractSearchQueryText(url: String): String {
-        return try {
-            val uri = Uri.parse(url)
-            val query = uri.getQueryParameter("q")
-                ?: uri.getQueryParameter("query")
-                ?: uri.getQueryParameter("search_query")
-                ?: ""
-            query.lowercase(Locale.ROOT)
-        } catch (e: Exception) {
-            ""
-        }
+        val queryParameters = url.substringAfter('?', "").substringBefore('#').split('&')
+        val searchValue = queryParameters.firstNotNullOfOrNull { parameter ->
+            val (name, value) = parameter.split('=', limit = 2).let {
+                it.first() to it.getOrElse(1) { "" }
+            }
+            value.takeIf { name.equals("q", ignoreCase = true) ||
+                name.equals("query", ignoreCase = true) ||
+                name.equals("search_query", ignoreCase = true) }
+        }.orEmpty()
+
+        return decodeUrl(searchValue.replace('+', ' ')).lowercase(Locale.ROOT)
     }
 }
