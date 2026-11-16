@@ -1,7 +1,6 @@
 package com.rushgames.barrier.filter
 
 import android.graphics.BitmapFactory
-import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,7 +17,6 @@ import java.util.regex.Pattern
  */
 object Level3ContentAnalyzer {
 
-    private const val TAG = "Level3ContentAnalyzer"
     private const val BLOCK_SCORE_THRESHOLD = 15
 
     private val httpClient = OkHttpClient.Builder()
@@ -173,7 +171,6 @@ object Level3ContentAnalyzer {
                 )
             }
         } catch (e: Exception) {
-            Log.d(TAG, "HTTP preflight skipped for $url: ${e.message}")
             ExtractedWebPageContent(url = url)
         }
     }
