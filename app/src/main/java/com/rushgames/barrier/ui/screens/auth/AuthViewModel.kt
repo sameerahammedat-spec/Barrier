@@ -36,48 +36,39 @@ class AuthViewModel @Inject constructor(
     }
 
     fun loginWithEmail(email: String, pass: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val result = authRepository.loginWithEmail(email, pass)
-            result.fold(
-                onSuccess = { u ->
-                    _uiState.update { it.copy(isLoading = false, user = u, isSuccess = true) }
-                },
-                onFailure = { err ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = err.message) }
-                }
-            )
+        when {
+            !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() ->
+                showAuthError("Enter a valid email address.")
+            pass.isBlank() -> showAuthError("Enter your password.")
+            else -> publishAuthResult(authRepository.loginWithEmail())
         }
     }
 
     fun signUpWithEmail(email: String, pass: String, name: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val result = authRepository.signUpWithEmail(email, pass, name)
-            result.fold(
-                onSuccess = { u ->
-                    _uiState.update { it.copy(isLoading = false, user = u, isSuccess = true) }
-                },
-                onFailure = { err ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = err.message) }
-                }
-            )
+        when {
+            name.isBlank() -> showAuthError("Enter your name.")
+            !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() ->
+                showAuthError("Enter a valid email address.")
+            pass.length < 6 -> showAuthError("Password must be at least 6 characters.")
+            else -> publishAuthResult(authRepository.signUpWithEmail())
         }
     }
 
-    fun signInWithGoogle(email: String = "google.user@barrier.app", name: String = "Google User") {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val result = authRepository.signInWithGoogle("mock_google_id_token", email, name)
-            result.fold(
-                onSuccess = { u ->
-                    _uiState.update { it.copy(isLoading = false, user = u, isSuccess = true) }
-                },
-                onFailure = { err ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = err.message) }
-                }
-            )
-        }
+    fun signInWithGoogle() {
+        publishAuthResult(authRepository.signInWithGoogle())
+    }
+
+    private fun publishAuthResult(result: Result<User>) {
+        result.fold(
+            onSuccess = { user ->
+                _uiState.update { it.copy(user = user, isSuccess = true, isLoading = false, errorMessage = null) }
+            },
+            onFailure = { error -> showAuthError(error.message ?: "Authentication failed.") }
+        )
+    }
+
+    private fun showAuthError(message: String) {
+        _uiState.update { it.copy(isLoading = false, isSuccess = false, errorMessage = message) }
     }
 
     fun continueAsGuest() {

@@ -5,6 +5,8 @@ import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 
 enum class SessionStatus { IDLE, ACTIVE, PAUSED, COMPLETED, CANCELLED }
@@ -19,12 +21,26 @@ data class SessionBreakSettings(
 )
 
 class StringListConverter {
-    @TypeConverter
-    fun fromString(value: String): List<String> =
-        if (value.isEmpty()) emptyList() else value.split("|")
+    private val json = Json
 
     @TypeConverter
-    fun toString(list: List<String>): String = list.joinToString("|")
+    fun fromString(value: String): List<String> {
+        if (value.isEmpty()) return emptyList()
+        if (!value.startsWith(JSON_PREFIX)) return value.split('|')
+
+        return runCatching {
+            json.decodeFromString<List<String>>(value.removePrefix(JSON_PREFIX))
+        }.getOrElse { cause ->
+            throw IllegalArgumentException("Stored session string list is invalid", cause)
+        }
+    }
+
+    @TypeConverter
+    fun toString(list: List<String>): String = JSON_PREFIX + json.encodeToString(list)
+
+    private companion object {
+        const val JSON_PREFIX = "json:"
+    }
 }
 
 
@@ -52,4 +68,7 @@ data class Session(
     val breakSettings: SessionBreakSettings = SessionBreakSettings(),
     val blockAdultContent: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
-)
+) {
+    val preventsCancellation: Boolean
+        get() = isLocked || isStrictMode
+}

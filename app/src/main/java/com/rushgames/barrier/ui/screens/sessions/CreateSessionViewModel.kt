@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rushgames.barrier.data.datastore.BarrierPreferences
 import com.rushgames.barrier.data.model.*
 import com.rushgames.barrier.data.repository.BlocklistRepository
 import com.rushgames.barrier.data.repository.SessionRepository
@@ -28,20 +29,29 @@ data class CreateSessionUiState(
     val breakSettings: SessionBreakSettings = SessionBreakSettings(),
     val availableBlocklists: List<Blocklist> = emptyList(),
     val installedApps: List<AppInfo> = emptyList(),
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
+    val saveError: String? = null
 )
 
 @HiltViewModel
 class CreateSessionViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sessionRepository: SessionRepository,
-    private val blocklistRepository: BlocklistRepository
+    private val blocklistRepository: BlocklistRepository,
+    private val preferences: BarrierPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CreateSessionUiState())
     val uiState: StateFlow<CreateSessionUiState> = _uiState.asStateFlow()
+    private var strictModeChangedByUser = false
 
     init {
+        viewModelScope.launch {
+            val strictByDefault = preferences.strictModeGlobal.first()
+            if (!strictModeChangedByUser) {
+                _uiState.update { it.copy(isStrictMode = strictByDefault) }
+            }
+        }
         viewModelScope.launch {
             blocklistRepository.getAllBlocklists().collect { lists ->
                 _uiState.update { it.copy(availableBlocklists = lists) }
@@ -75,7 +85,10 @@ class CreateSessionViewModel @Inject constructor(
     fun setName(name: String) = _uiState.update { it.copy(name = name) }
     fun setDuration(hours: Int, minutes: Int) = _uiState.update { it.copy(durationHours = hours, durationMinutes = minutes) }
     fun toggleLocked() = _uiState.update { it.copy(isLocked = !it.isLocked) }
-    fun toggleStrictMode() = _uiState.update { it.copy(isStrictMode = !it.isStrictMode) }
+    fun toggleStrictMode() {
+        strictModeChangedByUser = true
+        _uiState.update { it.copy(isStrictMode = !it.isStrictMode) }
+    }
     fun toggleAdultContent() = _uiState.update { it.copy(blockAdultContent = !it.blockAdultContent) }
     fun setWebsiteFilterMode(mode: WebsiteFilterMode) = _uiState.update { it.copy(websiteFilterMode = mode) }
 
@@ -93,10 +106,10 @@ class CreateSessionViewModel @Inject constructor(
 
     fun addAllowedWebsite(domain: String) {
         if (domain.isBlank()) return
+        val cleanDomain = com.rushgames.barrier.filter.WebsiteDomainMatcher.normalizeDomain(domain) ?: return
         _uiState.update { state ->
-            val clean = domain.trim().lowercase().removePrefix("https://").removePrefix("http://")
             val current = state.allowedWebsites.toMutableList()
-            if (!current.contains(clean)) current.add(clean)
+            if (!current.contains(cleanDomain)) current.add(cleanDomain)
             state.copy(allowedWebsites = current)
         }
     }
@@ -108,7 +121,7 @@ class CreateSessionViewModel @Inject constructor(
     fun setBreakSettings(settings: SessionBreakSettings) = _uiState.update { it.copy(breakSettings = settings) }
 
     fun createSession(onSuccess: () -> Unit) = viewModelScope.launch {
-        _uiState.update { it.copy(isSaving = true) }
+        _uiState.update { it.copy(isSaving = true, saveError = null) }
         val s = _uiState.value
         val durationMin = s.durationHours * 60 + s.durationMinutes
         val now = System.currentTimeMillis()
@@ -118,8 +131,8 @@ class CreateSessionViewModel @Inject constructor(
             durationMinutes = maxOf(1, durationMin),
             startTime = now,
             endTime = now + durationMs,
-            status = SessionStatus.ACTIVE,
-            isLocked = s.isLocked,
+            status = SessionStatus.IDLE,
+            isLocked = s.isLocked || s.isStrictMode,
             isStrictMode = s.isStrictMode,
             websiteFilterMode = s.websiteFilterMode,
             blocklistIds = s.selectedBlocklistIds.map { it.toString() },
@@ -129,15 +142,57 @@ class CreateSessionViewModel @Inject constructor(
             breakSettings = s.breakSettings,
             blockAdultContent = s.blockAdultContent
         )
-        val sessionId = sessionRepository.createSession(session)
 
-        // Start Foreground Service & Expiration timer
-        runCatching {
-            val serviceIntent = android.content.Intent(context, com.rushgames.barrier.service.BlockingService::class.java).apply {
+        var createdSessionId: Long? = null
+        var rollbackSucceeded = true
+        try {
+            val sessionId = sessionRepository.createActiveSession(session)
+            if (sessionId == null) {
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        saveError = "A focus session is already active. Wait for it to finish before starting another."
+                    )
+                }
+                return@launch
+            }
+            createdSessionId = sessionId
+            com.rushgames.barrier.worker.SessionExpirationWorker.scheduleExpiration(
+                context,
+                sessionId,
+                durationMs
+            )
+            val serviceIntent = android.content.Intent(
+                context,
+                com.rushgames.barrier.service.BlockingService::class.java
+            ).apply {
                 action = com.rushgames.barrier.service.BlockingService.ACTION_START
             }
             context.startForegroundService(serviceIntent)
-            com.rushgames.barrier.worker.SessionExpirationWorker.scheduleExpiration(context, sessionId, durationMs)
+        } catch (cause: Exception) {
+            if (cause is kotlinx.coroutines.CancellationException) throw cause
+
+            createdSessionId?.let { sessionId ->
+                try {
+                    sessionRepository.failSessionStart(sessionId)
+                    if (sessionRepository.getActiveSessionOnce() == null) {
+                        context.stopService(
+                            android.content.Intent(context, com.rushgames.barrier.service.BlockingService::class.java)
+                        )
+                    }
+                } catch (rollbackCause: Exception) {
+                    rollbackSucceeded = false
+                    cause.addSuppressed(rollbackCause)
+                }
+            }
+
+            val message = when {
+                createdSessionId == null -> "Couldn't save the session. Check available storage and try again."
+                rollbackSucceeded -> "Barrier couldn't start monitoring. The session was canceled; check permissions and try again."
+                else -> "Barrier couldn't start monitoring or reset the saved session. Check its status before retrying."
+            }
+            _uiState.update { it.copy(isSaving = false, saveError = message) }
+            return@launch
         }
 
         _uiState.update { it.copy(isSaving = false) }

@@ -7,6 +7,7 @@ import android.util.Log
 import com.rushgames.barrier.data.model.SessionStatus
 import com.rushgames.barrier.data.repository.SessionRepository
 import com.rushgames.barrier.service.BlockingService
+import com.rushgames.barrier.util.PermissionManager
 import com.rushgames.barrier.worker.SessionExpirationWorker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -27,23 +28,27 @@ class BootReceiver : BroadcastReceiver() {
             val pendingResult = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
                 try {
+                    val now = System.currentTimeMillis()
+                    sessionRepository.completeExpiredSessions(now)
                     val activeSession = sessionRepository.getActiveSessionOnce()
-                    if (activeSession != null) {
-                        val now = System.currentTimeMillis()
-                        if (now < activeSession.endTime && activeSession.status == SessionStatus.ACTIVE) {
-                            Log.d("BarrierBoot", "Restoring active session: '${activeSession.name}'")
+                    if (activeSession != null && activeSession.status == SessionStatus.ACTIVE) {
+                        Log.d("BarrierBoot", "Restoring active session: '${activeSession.name}'")
+                        val remainingMs = activeSession.endTime - now
 
-                            // Restart Foreground Service
-                            val serviceIntent = Intent(context, BlockingService::class.java).apply {
-                                this.action = BlockingService.ACTION_START
+                        // Keep the durable expiry even if Android refuses a service restart.
+                        SessionExpirationWorker.scheduleExpiration(context, activeSession.id, remainingMs)
+
+                        if (PermissionManager.hasUsageStatsPermission(context)) {
+                            try {
+                                val serviceIntent = Intent(context, BlockingService::class.java).apply {
+                                    this.action = BlockingService.ACTION_START
+                                }
+                                context.startForegroundService(serviceIntent)
+                            } catch (serviceStartError: Exception) {
+                                Log.e("BarrierBoot", "Could not restore app-usage monitoring", serviceStartError)
                             }
-                            context.startForegroundService(serviceIntent)
-
-                            // Reschedule expiration worker
-                            val remainingMs = activeSession.endTime - now
-                            SessionExpirationWorker.scheduleExpiration(context, activeSession.id, remainingMs)
-                        } else if (now >= activeSession.endTime) {
-                            sessionRepository.completeSession(activeSession.id)
+                        } else {
+                            Log.w("BarrierBoot", "Usage Access is not granted; app-usage monitoring was not restarted")
                         }
                     }
                 } catch (e: Exception) {

@@ -18,6 +18,7 @@ import com.rushgames.barrier.data.model.WebsiteFilterMode
 import com.rushgames.barrier.data.repository.BlocklistRepository
 import com.rushgames.barrier.data.repository.SessionRepository
 import com.rushgames.barrier.ui.screens.restriction.RestrictionActivity
+import com.rushgames.barrier.util.PermissionManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import javax.inject.Inject
@@ -49,21 +50,33 @@ class BlockingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> {
-                startForegroundNotification()
-                startMonitoringLoop()
-            }
             ACTION_STOP -> {
                 stopMonitoringLoop()
                 stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                stopSelf(startId)
+                return START_NOT_STICKY
+            }
+            ACTION_START, null -> {
+                if (!PermissionManager.hasUsageStatsPermission(this)) {
+                    Log.w("BlockingService", "Usage Access is unavailable; stopping app-usage monitoring")
+                    stopMonitoringLoop()
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf(startId)
+                    return START_NOT_STICKY
+                }
+                startForegroundNotification()
+                startMonitoringLoop()
+                return START_STICKY
+            }
+            else -> {
+                stopSelf(startId)
+                return START_NOT_STICKY
             }
         }
-        return START_STICKY
     }
 
     private fun startForegroundNotification() {
-        val notification = buildNotification("Session active — Barrier is protecting your focus")
+        val notification = buildNotification("Focus session active — monitoring app activity")
         startForeground(NOTIFICATION_ID, notification)
     }
 
@@ -71,8 +84,20 @@ class BlockingService : Service() {
         monitoringJob?.cancel()
         monitoringJob = serviceScope.launch {
             while (isActive) {
+                val activeSession = sessionRepository.getActiveSessionOnce()
+                if (activeSession == null) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                    return@launch
+                }
+                if (activeSession.endTime <= System.currentTimeMillis()) {
+                    sessionRepository.completeSession(activeSession.id)
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                    return@launch
+                }
                 checkForegroundApp()
-                delay(1000L) // Poll every second
+                delay(1000L) // Poll every second while an active session is enforced
             }
         }
     }
@@ -121,8 +146,8 @@ class BlockingService : Service() {
         }.getOrDefault(foregroundPackage)
 
         // 1. Session Allowlist Check
-        val isAllowlistMode = activeSession.websiteFilterMode == WebsiteFilterMode.ALLOWLIST_ONLY ||
-                activeSession.allowedAppPackages.isNotEmpty()
+        // Empty app selections mean no app blocking, as stated in the session setup UI.
+        val isAllowlistMode = activeSession.allowedAppPackages.isNotEmpty()
 
         if (isAllowlistMode) {
             if (!activeSession.allowedAppPackages.contains(foregroundPackage)) {
@@ -197,7 +222,7 @@ class BlockingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Barrier Protection Active")
+            .setContentTitle("Barrier Session Monitoring")
             .setContentText(message)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(pendingIntent)
@@ -219,8 +244,9 @@ class BlockingService : Service() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+        stopMonitoringLoop()
         serviceScope.cancel()
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

@@ -1,6 +1,5 @@
 package com.rushgames.barrier.filter
 
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,29 +35,17 @@ class Level2DatabaseFilter @Inject constructor() {
     )
 
     fun isDomainInDatabase(domain: String, customDatabaseDomains: Set<String> = emptySet()): Level2Result {
-        val cleanDomain = domain.lowercase(Locale.ROOT).trim().removePrefix("www.")
+        val cleanDomain = WebsiteDomainMatcher.normalizeDomain(domain) ?: return Level2Result(false)
+        val matchingRule = (KNOWN_ADULT_DATABASE.asSequence() + customDatabaseDomains.asSequence())
+            .firstOrNull { WebsiteDomainMatcher.matchesDomain(cleanDomain, it) }
+            ?: return Level2Result(false)
 
-        if (KNOWN_ADULT_DATABASE.contains(cleanDomain) || customDatabaseDomains.contains(cleanDomain)) {
-            return Level2Result(true, "Blocked by Adult Content Database match ($cleanDomain)")
-        }
-
-        // Check root domain for subdomains (e.g. video.pornhub.com -> pornhub.com)
-        val parts = cleanDomain.split('.')
-        if (parts.size > 2) {
-            val rootDomain = parts.takeLast(2).joinToString(".")
-            if (KNOWN_ADULT_DATABASE.contains(rootDomain) || customDatabaseDomains.contains(rootDomain)) {
-                return Level2Result(true, "Blocked by Adult Content Database root domain ($rootDomain)")
-            }
-        }
-
-        return Level2Result(false)
+        return Level2Result(true, "Blocked by Adult Content Database domain ($matchingRule)")
     }
 
     /** Allow expanding adult content database dynamically at runtime */
     fun addToDatabase(domain: String) {
-        val clean = domain.lowercase(Locale.ROOT).trim().removePrefix("www.")
-        if (clean.isNotEmpty()) {
-            KNOWN_ADULT_DATABASE.add(clean)
-        }
+        val clean = WebsiteDomainMatcher.normalizeDomain(domain) ?: return
+        KNOWN_ADULT_DATABASE.add(clean)
     }
 }

@@ -68,8 +68,9 @@ class BlocklistDetailViewModel @Inject constructor(
     }
 
     fun addWebsiteToBlocklist(domain: String) = viewModelScope.launch {
-        if (currentBlocklistId != -1L && domain.isNotBlank()) {
-            blocklistRepository.addWebsiteToBlocklist(domain.trim(), currentBlocklistId)
+        val normalizedDomain = com.rushgames.barrier.filter.WebsiteDomainMatcher.normalizeDomain(domain) ?: return@launch
+        if (currentBlocklistId != -1L) {
+            blocklistRepository.addWebsiteToBlocklist(normalizedDomain, currentBlocklistId)
         }
     }
 

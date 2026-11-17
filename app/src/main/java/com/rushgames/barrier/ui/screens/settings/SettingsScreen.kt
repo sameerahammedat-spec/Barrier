@@ -32,7 +32,6 @@ fun SettingsScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showThemeDialog by remember { mutableStateOf(false) }
-    var showPinDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -55,19 +54,16 @@ fun SettingsScreen(
                 SettingsNavigationRow(
                     icon = Icons.Outlined.AccountCircle,
                     iconTint = BarrierGreen,
-                    title = if (user.isGuest) "Guest Account (Offline)" else user.displayName,
-                    description = if (user.isGuest) "Tap to sign in & enable cloud sync" else user.email,
-                    onClick = {
-                        if (user.isGuest) onNavigateAuth()
-                        else viewModel.syncCloudData()
-                    }
+                    title = if (user.isGuest) "Guest Account (Offline)" else "Unverified local profile",
+                    description = if (user.isGuest) "Online sign-in is not configured" else "This legacy profile is not authenticated or synced.",
+                    onClick = onNavigateAuth
                 )
                 SettingsDivider()
                 SettingsNavigationRow(
                     icon = Icons.Outlined.CloudSync,
                     iconTint = BarrierPurple,
-                    title = "Sync Data to Cloud",
-                    description = uiState.syncMessage ?: "Backup blocklists and focus stats",
+                    title = "Cloud Backup Unavailable",
+                    description = uiState.syncMessage ?: "Firebase authentication and backup are not configured.",
                     onClick = { viewModel.syncCloudData() }
                 )
                 SettingsDivider()
@@ -75,7 +71,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Logout,
                     iconTint = BarrierRed,
                     title = "Sign Out",
-                    description = "Disconnect current account session",
+                    description = "Clear this locally stored profile",
                     onClick = { viewModel.signOut() }
                 )
             } else {
@@ -83,7 +79,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Login,
                     iconTint = BarrierGreen,
                     title = "Sign In / Sign Up",
-                    description = "Sync your focus blocklists across devices",
+                    description = "Online sign-in is unavailable until Firebase is configured.",
                     onClick = onNavigateAuth
                 )
             }
@@ -111,8 +107,8 @@ fun SettingsScreen(
             SettingsToggleRow(
                 icon = Icons.Outlined.Security,
                 iconTint = BarrierGreen,
-                title = "Strict Mode",
-                description = "Maximum enforcement. No exceptions during sessions.",
+                title = "Strict Mode for New Sessions",
+                description = "Start new sessions with in-app cancellation locked. Android can still stop or uninstall Barrier.",
                 checked = uiState.strictModeGlobal,
                 onToggle = viewModel::toggleStrictMode
             )
@@ -121,7 +117,7 @@ fun SettingsScreen(
                 icon = Icons.Outlined.Block,
                 iconTint = BarrierRed,
                 title = "Adult Content Protection",
-                description = "Block adult websites and explicit content globally.",
+                description = "Check URLs and visible browser content when Accessibility is enabled; coverage is limited.",
                 checked = uiState.adultProtection,
                 onToggle = viewModel::toggleAdultProtection
             )
@@ -146,14 +142,6 @@ fun SettingsScreen(
                 iconTint = BarrierPurple,
                 title = "Accessibility Service",
                 description = "Required for stronger app blocking",
-                onClick = onNavigatePermissions
-            )
-            SettingsDivider()
-            SettingsNavigationRow(
-                icon = Icons.Outlined.VpnKey,
-                iconTint = BarrierPurple,
-                title = "VPN Permission",
-                description = "Required for website filtering",
                 onClick = onNavigatePermissions
             )
             SettingsDivider()
@@ -187,19 +175,19 @@ fun SettingsScreen(
         BarrierSectionHeader("Security & Recovery")
         Spacer(Modifier.height(8.dp))
         SettingsCard {
-            SettingsNavigationRow(
-                icon = Icons.Outlined.Pin,
-                iconTint = BarrierRed,
-                title = "Recovery PIN",
-                description = if (uiState.recoveryPin.isEmpty()) "Not set" else "••••",
-                onClick = { showPinDialog = true }
+            SettingsInfoRow(title = "Recovery PIN", value = "Unavailable")
+            Text(
+                text = "Barrier has no recovery flow and does not use a PIN for account or session recovery.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 12.dp)
             )
             SettingsDivider()
             SettingsNavigationRow(
                 icon = Icons.Outlined.AdminPanelSettings,
                 iconTint = BarrierRed,
                 title = "Device Administrator",
-                description = if (DeviceAdminManager.isDeviceAdminActive(context)) "Enabled (Anti-Uninstall Active)" else "Tap to enable anti-uninstall protection",
+                description = if (DeviceAdminManager.isDeviceAdminActive(context)) "Enabled; does not prevent uninstall on standard devices." else "Optional; does not provide anti-uninstall protection.",
                 onClick = { DeviceAdminManager.openDeviceAdminSettings(context) }
             )
         }
@@ -248,33 +236,6 @@ fun SettingsScreen(
         )
     }
 
-    // PIN dialog
-    if (showPinDialog) {
-        var pin by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showPinDialog = false },
-            title = { Text("Set Recovery PIN") },
-            text = {
-                OutlinedTextField(
-                    value = pin,
-                    onValueChange = { if (it.length <= 6) pin = it.filter { c -> c.isDigit() } },
-                    label = { Text("4–6 digit PIN") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.setRecoveryPin(pin); showPinDialog = false },
-                    enabled = pin.length >= 4,
-                    colors = ButtonDefaults.buttonColors(containerColor = BarrierGreen)
-                ) { Text("Save PIN") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPinDialog = false }) { Text("Cancel") }
-            }
-        )
-    }
 }
 
 @Composable
