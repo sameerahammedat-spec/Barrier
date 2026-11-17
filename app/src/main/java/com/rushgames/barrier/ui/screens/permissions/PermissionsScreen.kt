@@ -106,7 +106,7 @@ fun PermissionsScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "To reliably enforce app and browser blocking during locked sessions, Barrier requires system permissions.",
+                                text = "These permissions let Barrier check some app and browser activity. Coverage is limited, and Android can stop or revoke the services at any time.",
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -118,7 +118,7 @@ fun PermissionsScreen(
             item {
                 PermissionCard(
                     title = "Usage Access",
-                    description = "Allows Barrier to detect when a blocked app is opened in the foreground.",
+                    description = "May let Barrier detect some foreground app switches. Android can limit or revoke access.",
                     icon = Icons.Default.QueryStats,
                     isGranted = hasUsageStats,
                     onClick = { PermissionManager.openUsageStatsSettings(context) }
@@ -128,7 +128,7 @@ fun PermissionsScreen(
             item {
                 PermissionCard(
                     title = "Accessibility Service",
-                    description = "Required for instant app redirection, browser URL detection, and strict allowlist enforcement.",
+                    description = "Can redirect some blocked app launches and inspect accessible content in supported browsers. This is not device-wide enforcement.",
                     icon = Icons.Default.AccessibilityNew,
                     isGranted = hasAccessibility,
                     onClick = { PermissionManager.openAccessibilitySettings(context) }
@@ -138,7 +138,7 @@ fun PermissionsScreen(
             item {
                 PermissionCard(
                     title = "Display Over Other Apps",
-                    description = "Required to display the full-screen restriction overlay when a blocked app is launched.",
+                    description = "Allows a restriction overlay in supported cases. Android may limit background display.",
                     icon = Icons.Default.Layers,
                     isGranted = hasOverlay,
                     onClick = { PermissionManager.openOverlaySettings(context) }
@@ -158,7 +158,7 @@ fun PermissionsScreen(
             item {
                 PermissionCard(
                     title = "Battery Optimization Exemption",
-                    description = "Ensures background session timers and scheduled sessions are not killed by Android memory management.",
+                    description = "May improve timer reliability; Android can still stop background work.",
                     icon = Icons.Default.BatteryFull,
                     isGranted = isBatteryIgnored,
                     onClick = { PermissionManager.openBatteryOptimizationSettings(context) }

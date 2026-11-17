@@ -31,7 +31,7 @@ class BarrierPreferences @Inject constructor(
         val KEY_USAGE_STATS_GRANTED = booleanPreferencesKey("usage_stats_granted")
         val KEY_NOTIFICATION_ENABLED = booleanPreferencesKey("notification_enabled")
         val KEY_SHOW_ONBOARDING = booleanPreferencesKey("show_onboarding")
-        val KEY_RECOVERY_PIN = stringPreferencesKey("recovery_pin")
+        // Legacy recovery_pin values are intentionally left untouched for data preservation.
 
         // Auth & User Session Keys
         val KEY_USER_ID = stringPreferencesKey("user_id")
@@ -62,10 +62,6 @@ class BarrierPreferences @Inject constructor(
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { it[KEY_SHOW_ONBOARDING] ?: true }
 
-    val recoveryPin: Flow<String> = dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { it[KEY_RECOVERY_PIN] ?: "" }
-
     val user: Flow<User?> = dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { prefs ->
@@ -78,10 +74,6 @@ class BarrierPreferences @Inject constructor(
                 isGuest = prefs[KEY_IS_GUEST] ?: false
             )
         }
-
-    val isLoggedIn: Flow<Boolean> = dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { it[KEY_IS_LOGGED_IN] ?: false }
 
     suspend fun setTheme(theme: String) {
         dataStore.edit { it[KEY_THEME] = theme }
@@ -103,17 +95,13 @@ class BarrierPreferences @Inject constructor(
         dataStore.edit { it[KEY_SHOW_ONBOARDING] = show }
     }
 
-    suspend fun setRecoveryPin(pin: String) {
-        dataStore.edit { it[KEY_RECOVERY_PIN] = pin }
-    }
-
     suspend fun saveUser(user: User) {
         dataStore.edit { prefs ->
             prefs[KEY_USER_ID] = user.id
             prefs[KEY_USER_EMAIL] = user.email
             prefs[KEY_USER_NAME] = user.displayName
             prefs[KEY_AUTH_TOKEN] = user.authToken
-            prefs[KEY_IS_LOGGED_IN] = true
+            prefs[KEY_IS_LOGGED_IN] = false
             prefs[KEY_IS_GUEST] = user.isGuest
         }
     }

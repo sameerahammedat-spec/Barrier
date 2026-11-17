@@ -16,7 +16,6 @@ data class SettingsUiState(
     val strictModeGlobal: Boolean = false,
     val adultProtection: Boolean = false,
     val notificationsEnabled: Boolean = true,
-    val recoveryPin: String = "",
     val currentUser: User? = null,
     val syncMessage: String? = null
 )
@@ -37,14 +36,12 @@ class SettingsViewModel @Inject constructor(
                 prefs.theme,
                 prefs.strictModeGlobal,
                 prefs.adultProtection,
-                prefs.recoveryPin,
                 authRepository.currentUser
-            ) { theme, strict, adult, pin, user ->
+            ) { theme, strict, adult, user ->
                 SettingsUiState(
                     theme = theme,
                     strictModeGlobal = strict,
                     adultProtection = adult,
-                    recoveryPin = pin,
                     currentUser = user
                 )
             }.collect { _uiState.value = it }
@@ -54,7 +51,6 @@ class SettingsViewModel @Inject constructor(
     fun setTheme(theme: String) = viewModelScope.launch { prefs.setTheme(theme) }
     fun toggleStrictMode() = viewModelScope.launch { prefs.setStrictModeGlobal(!_uiState.value.strictModeGlobal) }
     fun toggleAdultProtection() = viewModelScope.launch { prefs.setAdultProtection(!_uiState.value.adultProtection) }
-    fun setRecoveryPin(pin: String) = viewModelScope.launch { prefs.setRecoveryPin(pin) }
 
     fun syncCloudData() {
         val user = _uiState.value.currentUser ?: return

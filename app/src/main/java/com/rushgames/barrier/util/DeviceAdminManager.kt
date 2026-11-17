@@ -22,7 +22,7 @@ object DeviceAdminManager {
             putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, getAdminComponent(context))
             putExtra(
                 DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                "Enable Device Administrator to prevent self-sabotage and app uninstallation during active locked focus sessions."
+                "Barrier's Device Administrator access does not prevent app uninstallation. Full device lockdown requires managed-device provisioning."
             )
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }

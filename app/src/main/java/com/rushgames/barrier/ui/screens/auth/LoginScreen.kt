@@ -86,9 +86,10 @@ fun LoginScreen(
                 )
 
                 Text(
-                    text = "Sign in to sync your focus protection",
+                    text = "Online sign-in is not configured. Continue as Guest for offline use.",
                     fontSize = 14.sp,
-                    color = Color(0xFF94A3B8)
+                    color = Color(0xFF94A3B8),
+                    textAlign = TextAlign.Center
                 )
             }
 

@@ -166,7 +166,7 @@ private fun ActiveSessionCard(session: Session) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     StatusBadge(BadgeStatus.ACTIVE, "Active")
-                    if (session.isLocked) {
+                    if (session.preventsCancellation) {
                         StatusBadge(BadgeStatus.WARNING, "Locked")
                     }
                 }
@@ -328,7 +328,7 @@ private fun UpcomingSessionRow(session: Session) {
                 Text(session.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text("${session.durationMinutes} min", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (session.isLocked) {
+            if (session.preventsCancellation) {
                 Icon(Icons.Outlined.Lock, contentDescription = "Locked", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
             }
         }

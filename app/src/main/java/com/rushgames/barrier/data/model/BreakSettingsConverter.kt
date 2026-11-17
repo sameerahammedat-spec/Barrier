@@ -2,6 +2,7 @@
 package com.rushgames.barrier.data.model
 
 import androidx.room.TypeConverter
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -12,10 +13,10 @@ class BreakSettingsConverter {
     }
 
     @TypeConverter
-    fun fromString(value: String): SessionBreakSettings {
-        return runCatching {
-            json.decodeFromString<SessionBreakSettings>(value)
-        }.getOrDefault(SessionBreakSettings())
+    fun fromString(value: String): SessionBreakSettings = try {
+        json.decodeFromString<SessionBreakSettings>(value)
+    } catch (cause: SerializationException) {
+        throw IllegalArgumentException("Stored session break settings are invalid", cause)
     }
 
     @TypeConverter

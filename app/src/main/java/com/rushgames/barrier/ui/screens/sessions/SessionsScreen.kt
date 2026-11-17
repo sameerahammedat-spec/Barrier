@@ -157,7 +157,7 @@ private fun SessionCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     StatusBadge(badgeStatus, badgeLabel)
-                    if (session.isLocked) {
+                    if (session.preventsCancellation) {
                         Icon(Icons.Outlined.Lock, contentDescription = "Locked",
                             modifier = Modifier.size(14.dp),
                             tint = BarrierOrange)
@@ -195,7 +195,7 @@ private fun SessionCard(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    if (session.status == SessionStatus.ACTIVE && onCancel != null && !session.isLocked) {
+                    if (session.status == SessionStatus.ACTIVE && onCancel != null && !session.preventsCancellation) {
                         DropdownMenuItem(
                             text = { Text("Cancel Session", color = BarrierRed) },
                             leadingIcon = { Icon(Icons.Outlined.Stop, contentDescription = null, tint = BarrierRed) },

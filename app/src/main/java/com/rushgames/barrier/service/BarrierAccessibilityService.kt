@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.rushgames.barrier.data.dao.StatsDao
+import com.rushgames.barrier.data.datastore.BarrierPreferences
 import com.rushgames.barrier.data.model.AttemptType
 import com.rushgames.barrier.data.model.BlockedAttempt
 import com.rushgames.barrier.data.model.KnownBrowsers
@@ -22,13 +23,23 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class BarrierAccessibilityService : AccessibilityService() {
 
+    companion object {
+        private val mutableConnectionStatus = MutableStateFlow(false)
+        val connectionStatus: StateFlow<Boolean> = mutableConnectionStatus.asStateFlow()
+    }
+
     @Inject lateinit var sessionRepository: SessionRepository
+    @Inject lateinit var preferences: BarrierPreferences
     @Inject lateinit var blocklistRepository: BlocklistRepository
     @Inject lateinit var statsDao: StatsDao
 
@@ -50,6 +61,11 @@ class BarrierAccessibilityService : AccessibilityService() {
         "com.android.launcher3",
         "com.google.android.apps.nexuslauncher"
     )
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        mutableConnectionStatus.value = true
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -96,8 +112,8 @@ class BarrierAccessibilityService : AccessibilityService() {
             }.getOrDefault(packageName)
 
             // 1. Session-based Allowlist Mode (Feature Set C)
-            val isAllowlistMode = activeSession.websiteFilterMode == WebsiteFilterMode.ALLOWLIST_ONLY ||
-                    activeSession.allowedAppPackages.isNotEmpty()
+            // Empty app selections mean no app blocking, as stated in the session setup UI.
+            val isAllowlistMode = activeSession.allowedAppPackages.isNotEmpty()
 
             if (isAllowlistMode) {
                 if (!activeSession.allowedAppPackages.contains(packageName)) {
@@ -153,8 +169,15 @@ class BarrierAccessibilityService : AccessibilityService() {
         val now = System.currentTimeMillis()
 
         serviceScope.launch {
-            val activeSession = sessionRepository.getActiveSessionOnce() ?: return@launch
-            if (activeSession.status != SessionStatus.ACTIVE) return@launch
+            var activeSession = sessionRepository.getActiveSessionOnce()
+            if (activeSession != null && now > activeSession.endTime) {
+                sessionRepository.completeSession(activeSession.id)
+                activeSession = null
+            }
+            if (activeSession?.status != SessionStatus.ACTIVE) activeSession = null
+
+            val globalAdultProtectionEnabled = preferences.adultProtection.first()
+            if (activeSession == null && !globalAdultProtectionEnabled) return@launch
 
             val rootNode = rootInActiveWindow ?: return@launch
             val rawUrl = findUrlInNode(rootNode) ?: return@launch
@@ -166,36 +189,44 @@ class BarrierAccessibilityService : AccessibilityService() {
             lastUrlInspectTime = now
 
             val cleanDomain = Level1UrlFilter.extractDomain(rawUrl)
-            Log.d("BarrierAccessibility", "Browser URL inspected: $rawUrl (Domain: $cleanDomain) in $packageName")
+            Log.d("BarrierAccessibility", "Browser host inspected: $cleanDomain in $packageName")
 
             // Level 1, 2, 3 Adult Content Filtering Check
-            if (activeSession.blockAdultContent || activeSession.websiteFilterMode == WebsiteFilterMode.ADULT_PROTECTION) {
+            val sessionAdultProtectionEnabled = activeSession?.let {
+                it.blockAdultContent || it.websiteFilterMode == WebsiteFilterMode.ADULT_PROTECTION
+            } == true
+            if (globalAdultProtectionEnabled || sessionAdultProtectionEnabled) {
                 val eval = AdultContentFilter.evaluateFullWebContent(
                     urlOrDomain = rawUrl,
                     rootNode = rootNode,
-                    performPreflightHttp = true
+                    performPreflightHttp = false
                 )
 
                 if (eval.isAdult) {
-                    blockWebsite(cleanDomain, "Adult Content Filter (L${eval.levelTriggered}: ${eval.reason})", activeSession.id, packageName)
+                    blockWebsite(
+                        cleanDomain,
+                        "Adult URL/content filter (L${eval.levelTriggered}: ${eval.reason})",
+                        activeSession?.id,
+                        packageName
+                    )
                     return@launch
                 }
             }
 
-            // Session Blocked Websites Check
-            if (activeSession.websiteFilterMode == WebsiteFilterMode.BLOCKLIST || activeSession.websiteFilterMode == WebsiteFilterMode.COMBINED) {
-                if (WebsiteDomainMatcher.matchesAny(cleanDomain, activeSession.blockedWebsites)) {
-                    blockWebsite(cleanDomain, "Blocked Website List ('${activeSession.name}')", activeSession.id, packageName)
+            // User-defined website rules apply only to the active session that owns them.
+            val session = activeSession ?: return@launch
+            if (session.websiteFilterMode == WebsiteFilterMode.BLOCKLIST || session.websiteFilterMode == WebsiteFilterMode.COMBINED) {
+                if (WebsiteDomainMatcher.matchesAny(cleanDomain, session.blockedWebsites)) {
+                    blockWebsite(cleanDomain, "Blocked Website List ('${session.name}')", session.id, packageName)
                     return@launch
                 }
             }
 
-            // Session Allowlist Check
-            if (activeSession.websiteFilterMode == WebsiteFilterMode.ALLOWLIST_ONLY || activeSession.websiteFilterMode == WebsiteFilterMode.COMBINED) {
-                if (activeSession.allowedWebsites.isNotEmpty()) {
-                    val isAllowed = WebsiteDomainMatcher.matchesAny(cleanDomain, activeSession.allowedWebsites)
+            if (session.websiteFilterMode == WebsiteFilterMode.ALLOWLIST_ONLY || session.websiteFilterMode == WebsiteFilterMode.COMBINED) {
+                if (session.allowedWebsites.isNotEmpty()) {
+                    val isAllowed = WebsiteDomainMatcher.matchesAny(cleanDomain, session.allowedWebsites)
                     if (!isAllowed) {
-                        blockWebsite(cleanDomain, "Website Allowlist Mode ('${activeSession.name}')", activeSession.id, packageName)
+                        blockWebsite(cleanDomain, "Website Allowlist Mode ('${session.name}')", session.id, packageName)
                         return@launch
                     }
                 }
@@ -203,7 +234,7 @@ class BarrierAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun blockWebsite(domain: String, reason: String, sessionId: Long, browserPackage: String) {
+    private fun blockWebsite(domain: String, reason: String, sessionId: Long?, browserPackage: String) {
         lastBlockedPackage = browserPackage
         lastBlockedTime = System.currentTimeMillis()
 
@@ -245,8 +276,14 @@ class BarrierAccessibilityService : AccessibilityService() {
         Log.d("BarrierAccessibility", "Service interrupted")
     }
 
+    override fun onUnbind(intent: Intent?): Boolean {
+        mutableConnectionStatus.value = false
+        return super.onUnbind(intent)
+    }
+
     override fun onDestroy() {
-        super.onDestroy()
+        mutableConnectionStatus.value = false
         serviceScope.cancel()
+        super.onDestroy()
     }
 }

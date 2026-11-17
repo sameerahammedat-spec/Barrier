@@ -17,6 +17,6 @@ class BarrierDeviceAdminReceiver : DeviceAdminReceiver() {
 
     override fun onDisableRequested(context: Context, intent: Intent): CharSequence {
         Log.d("BarrierAdmin", "Device Administrator disable requested")
-        return "WARNING: Barrier protection is currently active! Disabling Device Administrator will remove uninstallation protection and unlock restrictions."
+        return "Disabling Device Administrator removes its limited device-management access. It does not control uninstall or override Android session limits."
     }
 }

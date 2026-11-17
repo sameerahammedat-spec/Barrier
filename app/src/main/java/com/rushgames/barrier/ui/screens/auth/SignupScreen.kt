@@ -85,7 +85,7 @@ fun SignupScreen(
                 )
 
                 Text(
-                    text = "Join Barrier to sync your blocklists & stats",
+                    text = "Account creation is unavailable until Firebase Authentication is configured.",
                     fontSize = 14.sp,
                     color = Color(0xFF94A3B8)
                 )

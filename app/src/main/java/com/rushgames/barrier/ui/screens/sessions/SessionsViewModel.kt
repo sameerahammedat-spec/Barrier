@@ -44,7 +44,7 @@ class SessionsViewModel @Inject constructor(
     }
 
     fun cancelSession(session: Session) = viewModelScope.launch {
-        if (!session.isLocked) sessionRepository.cancelSession(session.id)
+        if (!session.preventsCancellation) sessionRepository.cancelSession(session.id)
     }
 
     fun deleteSession(session: Session) = viewModelScope.launch {

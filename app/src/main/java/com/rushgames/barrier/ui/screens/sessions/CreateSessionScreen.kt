@@ -83,6 +83,18 @@ fun CreateSessionScreen(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            uiState.saveError?.let { message ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
 
             // Name
             SectionLabel("Session Name")
@@ -175,7 +187,7 @@ fun CreateSessionScreen(
             OptionToggleRow(
                 icon = Icons.Outlined.Lock,
                 title = "Locked Mode",
-                description = "Cannot cancel or modify during session",
+                description = "Blocks in-app cancellation; Android can still stop or uninstall Barrier.",
                 checked = uiState.isLocked,
                 onToggle = viewModel::toggleLocked
             )
@@ -183,7 +195,7 @@ fun CreateSessionScreen(
             OptionToggleRow(
                 icon = Icons.Outlined.Security,
                 title = "Strict Mode",
-                description = "Maximum enforcement, no exceptions",
+                description = "Locks this session in Barrier until it expires; Android can still stop or uninstall the app.",
                 checked = uiState.isStrictMode,
                 onToggle = viewModel::toggleStrictMode
             )
