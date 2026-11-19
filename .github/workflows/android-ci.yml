@@ -37,7 +37,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run unit tests and assemble debug APK
-        run: ./gradlew --no-daemon clean testDebugUnitTest assembleDebug assembleDebugAndroidTest
+        run: bash ./gradlew --no-daemon clean testDebugUnitTest assembleDebug assembleDebugAndroidTest
 
       - name: Upload debug APK
         if: success()
