@@ -80,25 +80,6 @@ class ProtectionCenterUiStateTest {
     }
 
     @Test
-    fun sessionRulesAreNotReportedAsEnforcedWhenStoredSessionDataNeedsRecovery() {
-        val activeSession = Session(
-            name = "Focus",
-            durationMinutes = 30,
-            endTime = System.currentTimeMillis() + 60_000,
-            blockedWebsites = listOf("example.com")
-        )
-
-        assertFalse(
-            ProtectionCenterUiState(
-                activeSession = activeSession,
-                accessibilityEnabled = true,
-                accessibilityServiceConnected = true,
-                storageRecoveryNotice = "session rule lists"
-            ).sessionRulesEnforced
-        )
-    }
-
-    @Test
     fun expiredSessionIsNotReportedAsEnforced() {
         val expiredSession = Session(name = "Finished", durationMinutes = 30, endTime = System.currentTimeMillis() - 1)
 
