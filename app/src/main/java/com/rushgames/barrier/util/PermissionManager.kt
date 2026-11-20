@@ -2,6 +2,8 @@ package com.rushgames.barrier.util
 
 import android.app.AppOpsManager
 import android.app.NotificationManager
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.view.accessibility.AccessibilityManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -39,13 +41,15 @@ object PermissionManager {
     }
 
     fun hasAccessibilityPermission(context: Context): Boolean {
-        val expectedService = "${context.packageName}/${BarrierAccessibilityService::class.java.canonicalName}"
-        val enabledServices = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
+        val manager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+            ?: return false
 
-        return enabledServices.contains(expectedService)
+        return manager.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            .any { service ->
+                val serviceInfo = service.resolveInfo.serviceInfo
+                serviceInfo.packageName == context.packageName &&
+                    serviceInfo.name == BarrierAccessibilityService::class.java.name
+            }
     }
 
     fun openAccessibilitySettings(context: Context) {
