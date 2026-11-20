@@ -31,6 +31,7 @@ class BarrierPreferences @Inject constructor(
         val KEY_USAGE_STATS_GRANTED = booleanPreferencesKey("usage_stats_granted")
         val KEY_NOTIFICATION_ENABLED = booleanPreferencesKey("notification_enabled")
         val KEY_SHOW_ONBOARDING = booleanPreferencesKey("show_onboarding")
+        val KEY_STORAGE_RECOVERY_NOTICE = stringPreferencesKey("storage_recovery_notice")
         // Legacy recovery_pin values are intentionally left untouched for data preservation.
 
         // Auth & User Session Keys
@@ -61,6 +62,10 @@ class BarrierPreferences @Inject constructor(
     val showOnboarding: Flow<Boolean> = dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { it[KEY_SHOW_ONBOARDING] ?: true }
+
+    val storageRecoveryNotice: Flow<String?> = dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[KEY_STORAGE_RECOVERY_NOTICE] }
 
     val user: Flow<User?> = dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
@@ -93,6 +98,14 @@ class BarrierPreferences @Inject constructor(
 
     suspend fun setShowOnboarding(show: Boolean) {
         dataStore.edit { it[KEY_SHOW_ONBOARDING] = show }
+    }
+
+    suspend fun setStorageRecoveryNotice(notice: String) {
+        dataStore.edit { it[KEY_STORAGE_RECOVERY_NOTICE] = notice }
+    }
+
+    suspend fun clearStorageRecoveryNotice() {
+        dataStore.edit { it.remove(KEY_STORAGE_RECOVERY_NOTICE) }
     }
 
     suspend fun saveUser(user: User) {
