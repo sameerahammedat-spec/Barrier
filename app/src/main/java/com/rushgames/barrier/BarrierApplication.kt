@@ -31,6 +31,7 @@ class BarrierApplication : Application(), Configuration.Provider {
                 }
             }
         }
+    }
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
