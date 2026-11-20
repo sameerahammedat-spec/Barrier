@@ -31,3 +31,10 @@ This decision closes only the historical v1 migration question. It does not comp
 ## Release gate
 
 Before the first production release, verify that the generated Room version-2 schema is committed. For every subsequent release that changes the schema, add and run migration tests against the immediately previous released schema.
+
+
+## Phase 1 code follow-up (2026-11-20)
+
+The Room v2 schema export is present at `app/schemas/com.rushgames.barrier.data.database.BarrierDatabase/2.json`. No database version change is needed for converter recovery because the TypeConverters now return safe read defaults and report malformed values without modifying the stored row. A persisted recovery notice is shown to the user, and session-specific enforcement pauses until the affected sessions are reviewed/recreated.
+
+This does not replace the required fresh build/test run or physical-device validation of permission revocation, process death, reboot, and service recovery.

@@ -6,7 +6,9 @@
 - Keep automatic backup disabled until authenticated, consented backup exists.
 - Add converter and session policy tests.
 - **Database release decision (2026-11-17):** the project owner confirms no earlier Barrier version was distributed. Room schema version 2 is the initial release baseline; no v1 migration is required. Keep schema export enabled and commit the v2 schema. Do not add destructive migration fallback. Every future released schema version must have a forward migration and preservation test.
-- **Remaining Phase 1 gate:** implement safe, user-visible handling for corrupt persisted converter data; verify service recovery and permission revocation on a working Android device. Unit/build success alone does not prove Android lifecycle behavior.
+- Corrupt Room converter values now use safe read defaults without overwriting the original database text. A process-wide recovery signal is persisted in DataStore, surfaced in Settings and Protection Center, and pauses session-specific enforcement until the affected sessions are reviewed/recreated.
+- Usage Access is rechecked during the running poll loop; revocation stops the foreground monitor. Accessibility permission status uses Android's enabled-service registry and the service reports interruption/disconnection accurately.
+- **Remaining Phase 1 gate:** compile and run the new recovery tests, then verify service recovery, permission revocation, process death and reboot on a working Android device. Unit/build success alone does not prove Android lifecycle behavior.
 
 ## Phase 2 — Core protection
 

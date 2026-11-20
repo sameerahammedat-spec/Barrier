@@ -2,7 +2,9 @@ package com.rushgames.barrier
 
 import com.rushgames.barrier.data.model.BreakSettingsConverter
 import com.rushgames.barrier.data.model.SessionBreakSettings
+import com.rushgames.barrier.data.model.StoredDataRecoveryReporter
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BreakSettingsConverterTest {
@@ -27,8 +29,12 @@ class BreakSettingsConverterTest {
         )
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun corruptStoredValueIsNotSilentlyReplacedWithDefaults() {
-        converter.fromString("{")
+    @Test
+    fun corruptStoredValueUsesSafeDefaultsAndReportsRecovery() {
+        StoredDataRecoveryReporter.acknowledgeAfterRepair()
+
+        assertEquals(SessionBreakSettings(), converter.fromString("{"))
+        assertTrue(StoredDataRecoveryReporter.hasCorruption)
+        assertTrue(StoredDataRecoveryReporter.affectedValues.value.contains("session break settings"))
     }
 }
