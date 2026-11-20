@@ -87,13 +87,14 @@ class BlockingService : Service() {
     private fun startMonitoringLoop() {
         monitoringJob?.cancel()
         monitoringJob = serviceScope.launch {
+            if (preferences.storageRecoveryNotice.first() != null || StoredDataRecoveryReporter.hasCorruption) {
+                Log.e("BlockingService", "Session monitoring paused until saved session data is repaired")
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@launch
+            }
+
             while (isActive) {
-                if (preferences.storageRecoveryNotice.first() != null || StoredDataRecoveryReporter.hasCorruption) {
-                    Log.e("BlockingService", "Session monitoring paused until saved session data is repaired")
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
-                    return@launch
-                }
                 if (!PermissionManager.hasUsageStatsPermission(this@BlockingService)) {
                     Log.w("BlockingService", "Usage Access was revoked; stopping app-usage monitoring")
                     stopForeground(STOP_FOREGROUND_REMOVE)
