@@ -279,7 +279,6 @@ class BarrierAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        mutableConnectionStatus.value = false
         Log.d("BarrierAccessibility", "Service interrupted")
     }
 
