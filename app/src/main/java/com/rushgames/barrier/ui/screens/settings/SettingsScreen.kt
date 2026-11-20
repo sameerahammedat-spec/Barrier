@@ -60,13 +60,13 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Barrier could not read some saved ${uiState.storageRecoveryNotice}. It used safe defaults for those values and kept the original database text unchanged. Session app and website rules are paused until you review and recreate affected sessions.",
+                        "Barrier could not read some saved ${uiState.storageRecoveryNotice}. It is using safe read defaults. A later session update may replace the unreadable field, so recreate affected sessions before acknowledging this warning.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = viewModel::acknowledgeStorageRecovery) {
-                        Text("I've reviewed the affected sessions")
+                        Text("I've recreated the affected sessions")
                     }
                 }
             }

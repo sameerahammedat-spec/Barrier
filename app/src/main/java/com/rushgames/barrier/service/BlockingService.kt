@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.rushgames.barrier.MainActivity
 import com.rushgames.barrier.data.dao.StatsDao
+import com.rushgames.barrier.data.datastore.BarrierPreferences
 import com.rushgames.barrier.data.model.AttemptType
 import com.rushgames.barrier.data.model.BlockedAttempt
 import com.rushgames.barrier.data.model.KnownBrowsers
@@ -22,6 +23,7 @@ import com.rushgames.barrier.ui.screens.restriction.RestrictionActivity
 import com.rushgames.barrier.util.PermissionManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -35,6 +37,7 @@ class BlockingService : Service() {
     }
 
     @Inject lateinit var sessionRepository: SessionRepository
+    @Inject lateinit var preferences: BarrierPreferences
     @Inject lateinit var blocklistRepository: BlocklistRepository
     @Inject lateinit var statsDao: StatsDao
 
@@ -85,6 +88,12 @@ class BlockingService : Service() {
         monitoringJob?.cancel()
         monitoringJob = serviceScope.launch {
             while (isActive) {
+                if (preferences.storageRecoveryNotice.first() != null || StoredDataRecoveryReporter.hasCorruption) {
+                    Log.e("BlockingService", "Session monitoring paused until saved session data is repaired")
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                    return@launch
+                }
                 if (!PermissionManager.hasUsageStatsPermission(this@BlockingService)) {
                     Log.w("BlockingService", "Usage Access was revoked; stopping app-usage monitoring")
                     stopForeground(STOP_FOREGROUND_REMOVE)

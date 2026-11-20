@@ -97,7 +97,7 @@ class BarrierAccessibilityService : AccessibilityService() {
 
         serviceScope.launch {
             val activeSession = sessionRepository.getActiveSessionOnce() ?: return@launch
-            if (StoredDataRecoveryReporter.hasCorruption) {
+            if (preferences.storageRecoveryNotice.first() != null || StoredDataRecoveryReporter.hasCorruption) {
                 Log.e("BarrierAccessibility", "Session rules paused because saved rule data is corrupt")
                 return@launch
             }
@@ -175,7 +175,9 @@ class BarrierAccessibilityService : AccessibilityService() {
 
         serviceScope.launch {
             var activeSession = sessionRepository.getActiveSessionOnce()
-            if (StoredDataRecoveryReporter.hasCorruption) activeSession = null
+            if (preferences.storageRecoveryNotice.first() != null || StoredDataRecoveryReporter.hasCorruption) {
+                activeSession = null
+            }
             if (activeSession != null && now > activeSession.endTime) {
                 sessionRepository.completeSession(activeSession.id)
                 activeSession = null

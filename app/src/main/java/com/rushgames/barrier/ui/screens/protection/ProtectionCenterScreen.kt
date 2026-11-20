@@ -150,7 +150,7 @@ fun ProtectionCenterScreen(
                         Column(Modifier.padding(16.dp)) {
                             Text("Session rules paused", fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(6.dp))
-                            Text("Barrier found unreadable saved session data (${state.storageRecoveryNotice}). Review and recreate affected sessions in Settings before relying on session protection.")
+                            Text("Barrier found unreadable saved session data (${state.storageRecoveryNotice}). Session-specific enforcement remains paused until you recreate the affected sessions and acknowledge the warning in Settings.")
                         }
                     }
                 }
