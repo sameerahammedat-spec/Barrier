@@ -24,7 +24,8 @@ data class ProtectionCenterUiState(
     val activeSession: Session? = null,
     val accessibilityEnabled: Boolean = false,
     val accessibilityServiceConnected: Boolean = false,
-    val adultProtectionEnabled: Boolean = false
+    val adultProtectionEnabled: Boolean = false,
+    val storageRecoveryNotice: String? = null
 ) {
     val sessionHasRules: Boolean
         get() = activeSession?.let { session ->
@@ -38,7 +39,8 @@ data class ProtectionCenterUiState(
 
     val sessionRulesEnforced: Boolean
         get() = activeSession?.let { it.endTime > System.currentTimeMillis() } == true &&
-            accessibilityEnabled && accessibilityServiceConnected && sessionHasRules
+            accessibilityEnabled && accessibilityServiceConnected && sessionHasRules &&
+            storageRecoveryNotice == null
 
     val globalAdultFilteringEnforced: Boolean
         get() = adultProtectionEnabled && accessibilityEnabled && accessibilityServiceConnected
@@ -63,14 +65,17 @@ class ProtectionCenterViewModel @Inject constructor(
             sessionRepository.getActiveSession(),
             accessibilityEnabled,
             BarrierAccessibilityService.connectionStatus,
-            preferences.adultProtection,
+            combine(preferences.adultProtection, preferences.storageRecoveryNotice) { adult, notice ->
+                adult to notice
+            },
             sessionClock
-        ) { session, isAccessibilityEnabled, isServiceConnected, adultProtectionEnabled, _ ->
+        ) { session, isAccessibilityEnabled, isServiceConnected, protectionState, _ ->
             ProtectionCenterUiState(
                 activeSession = session?.takeIf { it.endTime > System.currentTimeMillis() },
                 accessibilityEnabled = isAccessibilityEnabled,
                 accessibilityServiceConnected = isServiceConnected,
-                adultProtectionEnabled = adultProtectionEnabled
+                adultProtectionEnabled = protectionState.first,
+                storageRecoveryNotice = protectionState.second
             )
         }.stateIn(
             scope = viewModelScope,

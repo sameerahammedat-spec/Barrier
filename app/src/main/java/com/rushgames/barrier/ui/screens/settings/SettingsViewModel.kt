@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rushgames.barrier.data.datastore.BarrierPreferences
 import com.rushgames.barrier.data.model.User
+import com.rushgames.barrier.data.model.StoredDataRecoveryReporter
 import com.rushgames.barrier.data.repository.AuthRepository
 import com.rushgames.barrier.data.repository.CloudSyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,7 +18,8 @@ data class SettingsUiState(
     val adultProtection: Boolean = false,
     val notificationsEnabled: Boolean = true,
     val currentUser: User? = null,
-    val syncMessage: String? = null
+    val syncMessage: String? = null,
+    val storageRecoveryNotice: String? = null
 )
 
 @HiltViewModel
@@ -36,19 +38,28 @@ class SettingsViewModel @Inject constructor(
                 prefs.theme,
                 prefs.strictModeGlobal,
                 prefs.adultProtection,
-                authRepository.currentUser
-            ) { theme, strict, adult, user ->
+                authRepository.currentUser,
+                prefs.storageRecoveryNotice
+            ) { theme, strict, adult, user, recoveryNotice ->
                 SettingsUiState(
                     theme = theme,
                     strictModeGlobal = strict,
                     adultProtection = adult,
-                    currentUser = user
+                    currentUser = user,
+                    storageRecoveryNotice = recoveryNotice
                 )
             }.collect { _uiState.value = it }
         }
     }
 
     fun setTheme(theme: String) = viewModelScope.launch { prefs.setTheme(theme) }
+
+    fun acknowledgeStorageRecovery() {
+        viewModelScope.launch {
+            prefs.clearStorageRecoveryNotice()
+            StoredDataRecoveryReporter.acknowledgeAfterRepair()
+        }
+    }
     fun toggleStrictMode() = viewModelScope.launch { prefs.setStrictModeGlobal(!_uiState.value.strictModeGlobal) }
     fun toggleAdultProtection() = viewModelScope.launch { prefs.setAdultProtection(!_uiState.value.adultProtection) }
 

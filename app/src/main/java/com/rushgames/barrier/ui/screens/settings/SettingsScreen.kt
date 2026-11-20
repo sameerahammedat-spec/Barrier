@@ -43,7 +43,37 @@ fun SettingsScreen(
         Spacer(Modifier.height(24.dp))
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
         Text("Customize Barrier", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(16.dp))
+
+        if (uiState.storageRecoveryNotice != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        "Saved session data needs attention",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Barrier could not read some saved ${uiState.storageRecoveryNotice}. It used safe defaults for those values and kept the original database text unchanged. Session app and website rules are paused until you review and recreate affected sessions.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = viewModel::acknowledgeStorageRecovery) {
+                        Text("I've reviewed the affected sessions")
+                    }
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+        } else {
+            Spacer(Modifier.height(12.dp))
+        }
 
         // === User Account & Cloud Sync Banner ===
         BarrierSectionHeader("Account & Cloud Backup")

@@ -71,6 +71,7 @@ fun ProtectionCenterScreen(
             title = "Session app and website rules",
             detail = when {
                 session == null -> "Inactive — start a focus session to apply its rules."
+                state.storageRecoveryNotice != null -> "Saved session settings are unreadable (${state.storageRecoveryNotice}). Session rules are paused. Review and recreate affected sessions in Settings."
                 !state.accessibilityEnabled -> "Waiting for Accessibility access. Session “${session.name}” is saved, but enforcement is not active."
                 !state.accessibilityServiceConnected -> "Accessibility is enabled, but its service is not connected. Session “${session.name}” is saved, but enforcement is not active."
                 !state.sessionHasRules -> "Session “${session.name}” is running, but no app, website, or adult-content rules are selected."
@@ -141,6 +142,18 @@ fun ProtectionCenterScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            if (state.storageRecoveryNotice != null) {
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Session rules paused", fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(6.dp))
+                            Text("Barrier found unreadable saved session data (${state.storageRecoveryNotice}). Review and recreate affected sessions in Settings before relying on session protection.")
+                        }
+                    }
+                }
             }
 
             if (session != null && (!state.accessibilityEnabled || !state.accessibilityServiceConnected)) {
