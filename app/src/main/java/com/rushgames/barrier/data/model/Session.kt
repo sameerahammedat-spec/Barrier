@@ -5,6 +5,7 @@ import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -28,10 +29,11 @@ class StringListConverter {
         if (value.isEmpty()) return emptyList()
         if (!value.startsWith(JSON_PREFIX)) return value.split('|')
 
-        return runCatching {
+        return try {
             json.decodeFromString<List<String>>(value.removePrefix(JSON_PREFIX))
-        }.getOrElse { cause ->
-            throw IllegalArgumentException("Stored session string list is invalid", cause)
+        } catch (cause: SerializationException) {
+            StoredDataRecoveryReporter.report("session rule lists")
+            emptyList()
         }
     }
 

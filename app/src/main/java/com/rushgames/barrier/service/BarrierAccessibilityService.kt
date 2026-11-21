@@ -11,6 +11,7 @@ import com.rushgames.barrier.data.model.AttemptType
 import com.rushgames.barrier.data.model.BlockedAttempt
 import com.rushgames.barrier.data.model.KnownBrowsers
 import com.rushgames.barrier.data.model.SessionStatus
+import com.rushgames.barrier.data.model.StoredDataRecoveryReporter
 import com.rushgames.barrier.data.model.WebsiteFilterMode
 import com.rushgames.barrier.data.repository.BlocklistRepository
 import com.rushgames.barrier.data.repository.SessionRepository
@@ -96,6 +97,10 @@ class BarrierAccessibilityService : AccessibilityService() {
 
         serviceScope.launch {
             val activeSession = sessionRepository.getActiveSessionOnce() ?: return@launch
+            if (preferences.storageRecoveryNotice.first() != null || StoredDataRecoveryReporter.hasCorruption) {
+                Log.e("BarrierAccessibility", "Session rules paused because saved rule data is corrupt")
+                return@launch
+            }
 
             // Check if active session is expired
             if (now > activeSession.endTime) {
@@ -170,6 +175,9 @@ class BarrierAccessibilityService : AccessibilityService() {
 
         serviceScope.launch {
             var activeSession = sessionRepository.getActiveSessionOnce()
+            if (preferences.storageRecoveryNotice.first() != null || StoredDataRecoveryReporter.hasCorruption) {
+                activeSession = null
+            }
             if (activeSession != null && now > activeSession.endTime) {
                 sessionRepository.completeSession(activeSession.id)
                 activeSession = null

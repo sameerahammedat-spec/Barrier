@@ -16,7 +16,8 @@ class BreakSettingsConverter {
     fun fromString(value: String): SessionBreakSettings = try {
         json.decodeFromString<SessionBreakSettings>(value)
     } catch (cause: SerializationException) {
-        throw IllegalArgumentException("Stored session break settings are invalid", cause)
+        StoredDataRecoveryReporter.report("session break settings")
+        SessionBreakSettings()
     }
 
     @TypeConverter

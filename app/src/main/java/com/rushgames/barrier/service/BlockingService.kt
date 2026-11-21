@@ -10,10 +10,12 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.rushgames.barrier.MainActivity
 import com.rushgames.barrier.data.dao.StatsDao
+import com.rushgames.barrier.data.datastore.BarrierPreferences
 import com.rushgames.barrier.data.model.AttemptType
 import com.rushgames.barrier.data.model.BlockedAttempt
 import com.rushgames.barrier.data.model.KnownBrowsers
 import com.rushgames.barrier.data.model.SessionStatus
+import com.rushgames.barrier.data.model.StoredDataRecoveryReporter
 import com.rushgames.barrier.data.model.WebsiteFilterMode
 import com.rushgames.barrier.data.repository.BlocklistRepository
 import com.rushgames.barrier.data.repository.SessionRepository
@@ -21,6 +23,7 @@ import com.rushgames.barrier.ui.screens.restriction.RestrictionActivity
 import com.rushgames.barrier.util.PermissionManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -34,6 +37,7 @@ class BlockingService : Service() {
     }
 
     @Inject lateinit var sessionRepository: SessionRepository
+    @Inject lateinit var preferences: BarrierPreferences
     @Inject lateinit var blocklistRepository: BlocklistRepository
     @Inject lateinit var statsDao: StatsDao
 
@@ -83,8 +87,28 @@ class BlockingService : Service() {
     private fun startMonitoringLoop() {
         monitoringJob?.cancel()
         monitoringJob = serviceScope.launch {
+            if (preferences.storageRecoveryNotice.first() != null || StoredDataRecoveryReporter.hasCorruption) {
+                Log.e("BlockingService", "Session monitoring paused until saved session data is repaired")
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@launch
+            }
+
             while (isActive) {
+                if (!PermissionManager.hasUsageStatsPermission(this@BlockingService)) {
+                    Log.w("BlockingService", "Usage Access was revoked; stopping app-usage monitoring")
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                    return@launch
+                }
+
                 val activeSession = sessionRepository.getActiveSessionOnce()
+                if (StoredDataRecoveryReporter.hasCorruption) {
+                    Log.e("BlockingService", "Session rules paused because saved rule data is corrupt")
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                    return@launch
+                }
                 if (activeSession == null) {
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
@@ -97,6 +121,12 @@ class BlockingService : Service() {
                     return@launch
                 }
                 checkForegroundApp()
+                if (StoredDataRecoveryReporter.hasCorruption) {
+                    Log.e("BlockingService", "Stopping monitoring after a corrupt session value was detected")
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                    return@launch
+                }
                 delay(1000L) // Poll every second while an active session is enforced
             }
         }
@@ -104,6 +134,7 @@ class BlockingService : Service() {
 
     private suspend fun checkForegroundApp() {
         val activeSession = sessionRepository.getActiveSessionOnce() ?: return
+        if (StoredDataRecoveryReporter.hasCorruption) return
         val now = System.currentTimeMillis()
 
         if (now > activeSession.endTime) {
@@ -196,17 +227,22 @@ class BlockingService : Service() {
         val endTime = System.currentTimeMillis()
         val startTime = endTime - 5000L
 
-        val events = usm.queryEvents(startTime, endTime) ?: return null
-        val event = UsageEvents.Event()
-        var lastPackage: String? = null
+        return try {
+            val events = usm.queryEvents(startTime, endTime) ?: return null
+            val event = UsageEvents.Event()
+            var lastPackage: String? = null
 
-        while (events.hasNextEvent()) {
-            events.getNextEvent(event)
-            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                lastPackage = event.packageName
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                    lastPackage = event.packageName
+                }
             }
+            lastPackage
+        } catch (cause: SecurityException) {
+            Log.w("BlockingService", "Usage Access was revoked while reading app events", cause)
+            null
         }
-        return lastPackage
     }
 
     private fun stopMonitoringLoop() {
