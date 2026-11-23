@@ -23,6 +23,7 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): BarrierDatabase =
         Room.databaseBuilder(context, BarrierDatabase::class.java, BarrierDatabase.DATABASE_NAME)
             // Refuse unknown schema upgrades rather than silently deleting user data.
+            .addMigrations(BarrierDatabase.MIGRATION_2_3)
             .build()
 
     @Provides
