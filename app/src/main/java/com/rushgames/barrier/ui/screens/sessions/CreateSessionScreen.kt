@@ -1,6 +1,7 @@
 package com.rushgames.barrier.ui.screens.sessions
 
 import androidx.compose.foundation.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,6 +14,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rushgames.barrier.data.model.SessionBreakSettings
@@ -32,6 +34,7 @@ fun CreateSessionScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAppPicker by remember { mutableStateOf(false) }
     var newWebsite by remember { mutableStateOf("") }
+    var durationValid by remember { mutableStateOf(true) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -63,7 +66,7 @@ fun CreateSessionScreen(
                     Button(
                         onClick = { viewModel.createSession(onSessionCreated) },
                         modifier = Modifier.weight(2f),
-                        enabled = !uiState.isSaving && SessionDurationPolicy.isValid(SessionDurationPolicy.toMinutes(uiState.durationHours, uiState.durationMinutes)),
+                        enabled = !uiState.isSaving && durationValid && SessionDurationPolicy.isValid(SessionDurationPolicy.toMinutes(uiState.durationHours, uiState.durationMinutes)),
                         colors = ButtonDefaults.buttonColors(containerColor = BarrierGreen),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -116,7 +119,8 @@ fun CreateSessionScreen(
             DurationPicker(
                 hours = uiState.durationHours,
                 minutes = uiState.durationMinutes,
-                onDurationChange = viewModel::setDuration
+                onDurationChange = viewModel::setDuration,
+                onValidityChange = { durationValid = it }
             )
 
             // Blocklists
@@ -283,24 +287,23 @@ private fun SectionLabel(text: String) {
 private enum class DurationUnit { MINUTES, HOURS, DAYS }
 
 @Composable
-private fun DurationPicker(hours: Int, minutes: Int, onDurationChange: (Int, Int) -> Unit) {
+private fun DurationPicker(
+    hours: Int,
+    minutes: Int,
+    onDurationChange: (Int, Int) -> Unit,
+    onValidityChange: (Boolean) -> Unit
+) {
     var unit by remember { mutableStateOf(DurationUnit.HOURS) }
     val totalMinutes = SessionDurationPolicy.toMinutes(hours, minutes)
     val amount = when (unit) {
-        DurationUnit.MINUTES -> totalMinutes.coerceIn(5, 59)
-        DurationUnit.HOURS -> ((totalMinutes + 59) / 60).coerceIn(1, 168)
-        DurationUnit.DAYS -> ((totalMinutes + 1_439) / 1_440).coerceIn(1, 7)
+        DurationUnit.MINUTES -> totalMinutes
+        DurationUnit.HOURS -> (totalMinutes + 59) / 60
+        DurationUnit.DAYS -> (totalMinutes + 1_439) / 1_440
     }
-    val range = when (unit) {
-        DurationUnit.MINUTES -> 5f..59f
-        DurationUnit.HOURS -> 1f..168f
-        DurationUnit.DAYS -> 1f..7f
-    }
-    val steps = when (unit) {
-        DurationUnit.MINUTES -> 53
-        DurationUnit.HOURS -> 166
-        DurationUnit.DAYS -> 5
-    }
+    var amountText by remember(unit, amount) { mutableStateOf(amount.toString()) }
+    val minValue = when (unit) { DurationUnit.MINUTES -> 5; DurationUnit.HOURS -> 1; DurationUnit.DAYS -> 1 }
+    val maxValue = when (unit) { DurationUnit.MINUTES -> 10_080; DurationUnit.HOURS -> 168; DurationUnit.DAYS -> 7 }
+    val unitLabel = when (unit) { DurationUnit.MINUTES -> "minutes"; DurationUnit.HOURS -> "hours"; DurationUnit.DAYS -> "days" }
     val durationLabel = when {
         totalMinutes < 60 -> totalMinutes.toString() + " minutes"
         totalMinutes % 1_440 == 0 -> (totalMinutes / 1_440).toString() + " days"
@@ -318,10 +321,16 @@ private fun DurationPicker(hours: Int, minutes: Int, onDurationChange: (Int, Int
                     onClick = {
                         unit = option
                         val nextTotal = when (option) {
-                            DurationUnit.MINUTES -> totalMinutes.coerceIn(5, 59)
+                            DurationUnit.MINUTES -> totalMinutes.coerceIn(5, 10_080)
                             DurationUnit.HOURS -> ((totalMinutes + 59) / 60).coerceIn(1, 168) * 60
                             DurationUnit.DAYS -> ((totalMinutes + 1_439) / 1_440).coerceIn(1, 7) * 1_440
                         }
+                        amountText = when (option) {
+                            DurationUnit.MINUTES -> nextTotal.toString()
+                            DurationUnit.HOURS -> (nextTotal / 60).toString()
+                            DurationUnit.DAYS -> (nextTotal / 1_440).toString()
+                        }
+                        onValidityChange(true)
                         onDurationChange(nextTotal / 60, nextTotal % 60)
                     },
                     label = { Text(label) }
@@ -335,29 +344,40 @@ private fun DurationPicker(hours: Int, minutes: Int, onDurationChange: (Int, Int
                     onClick = {
                         onDurationChange(presetHours, presetMinutes)
                         unit = if (presetHours == 0) DurationUnit.MINUTES else DurationUnit.HOURS
+                        amountText = if (presetHours == 0) presetMinutes.toString() else presetHours.toString()
+                        onValidityChange(true)
                     },
                     label = { Text(label, style = MaterialTheme.typography.labelSmall) }
                 )
             }
         }
-        Text("Custom duration: " + durationLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-        Slider(
-            value = amount.toFloat(),
-            onValueChange = { raw ->
-                val selected = raw.toInt()
-                val nextTotal = when (unit) {
-                    DurationUnit.MINUTES -> selected
-                    DurationUnit.HOURS -> selected * 60
-                    DurationUnit.DAYS -> selected * 1_440
+        OutlinedTextField(
+            value = amountText,
+            onValueChange = { newValue ->
+                if (newValue.length <= 5 && newValue.all { it.isDigit() }) {
+                    amountText = newValue
+                    val parsed = newValue.toIntOrNull()
+                    val valid = parsed != null && parsed in minValue..maxValue
+                    onValidityChange(valid)
+                    if (valid) {
+                        val nextTotal = when (unit) {
+                            DurationUnit.MINUTES -> parsed!!
+                            DurationUnit.HOURS -> parsed!! * 60
+                            DurationUnit.DAYS -> parsed!! * 1_440
+                        }
+                        onDurationChange(nextTotal / 60, nextTotal % 60)
+                    }
                 }
-                onDurationChange(nextTotal / 60, nextTotal % 60)
             },
-            valueRange = range,
-            steps = steps,
-            colors = SliderDefaults.colors(thumbColor = BarrierPurple, activeTrackColor = BarrierPurple)
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Custom duration") },
+            suffix = { Text(unitLabel) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            isError = amountText.toIntOrNull()?.let { it !in minValue..maxValue } ?: true
         )
         Text(
-            "Estimated end: " + estimatedEnd + " · Minimum 5 minutes · Maximum 7 days",
+            "Enter $minValue–$maxValue $unitLabel. Selected: " + durationLabel + ". Estimated end: " + estimatedEnd,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
