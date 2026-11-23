@@ -8,6 +8,7 @@ import com.rushgames.barrier.data.datastore.BarrierPreferences
 import com.rushgames.barrier.data.model.*
 import com.rushgames.barrier.data.repository.BlocklistRepository
 import com.rushgames.barrier.data.repository.SessionRepository
+import com.rushgames.barrier.util.ProtectedAppPackages
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
@@ -68,6 +69,7 @@ class CreateSessionViewModel @Inject constructor(
             val intent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
                 addCategory(android.content.Intent.CATEGORY_LAUNCHER)
             }
+            val protectedPackages = ProtectedAppPackages.resolve(context)
             val apps = pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
                 .map { ri ->
                     AppInfo(
@@ -78,7 +80,7 @@ class CreateSessionViewModel @Inject constructor(
                         isBrowser = KnownBrowsers.ALL_KNOWN_BROWSERS.contains(ri.activityInfo.packageName)
                     )
                 }
-                .filterNot { SessionAppRuleEvaluator.isProtectedPackage(it.packageName, context.packageName) }
+                .filterNot { SessionAppRuleEvaluator.isProtectedPackage(it.packageName, context.packageName, protectedPackages) }
                 .sortedBy { it.appName }
                 .distinctBy { it.packageName }
             _uiState.update { it.copy(installedApps = apps) }
