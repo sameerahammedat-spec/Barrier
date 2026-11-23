@@ -46,6 +46,27 @@ class SessionAppRuleEvaluatorTest {
     }
 
     @Test
+    fun dynamicallyResolvedHomeAndDialerPackagesAreNeverBlocked() {
+        val rules = session(AppFilterMode.ALLOWLIST_ONLY, allowed = listOf("com.example.mail"))
+        assertFalse(
+            SessionAppRuleEvaluator.shouldBlock(
+                "com.oem.home",
+                rules,
+                "com.rushgames.barrier",
+                setOf("com.oem.home", "com.oem.dialer")
+            )
+        )
+        assertFalse(
+            SessionAppRuleEvaluator.shouldBlock(
+                "com.oem.dialer",
+                rules,
+                "com.rushgames.barrier",
+                setOf("com.oem.home", "com.oem.dialer")
+            )
+        )
+    }
+
+    @Test
     fun essentialPackagesAndBarrierAreNeverBlocked() {
         val rules = session(
             AppFilterMode.BLOCK_SELECTED,
