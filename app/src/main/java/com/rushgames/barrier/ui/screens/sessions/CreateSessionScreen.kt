@@ -34,6 +34,7 @@ fun CreateSessionScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAppPicker by remember { mutableStateOf(false) }
     var newWebsite by remember { mutableStateOf("") }
+    var newBlockedWebsite by remember { mutableStateOf("") }
     var durationValid by remember { mutableStateOf(true) }
 
     Scaffold(
@@ -180,7 +181,7 @@ fun CreateSessionScreen(
             )
             Text(
                 text = when (uiState.websiteFilterMode) {
-                    WebsiteFilterMode.BLOCKLIST -> "Apply the session's selected website block rules. This does not control app selection."
+                    WebsiteFilterMode.BLOCKLIST -> "Only websites listed below are blocked in supported browsers. App selection is configured separately."
                     WebsiteFilterMode.ALLOWLIST_ONLY -> "Only configured allowed websites are accessible in supported browsers."
                     WebsiteFilterMode.ADULT_PROTECTION -> "Apply Barrier's URL and accessible-text adult-content heuristics in supported browsers."
                     WebsiteFilterMode.COMBINED -> "Apply both configured website block rules and website allowlist rules."
@@ -189,6 +190,32 @@ fun CreateSessionScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            if (uiState.websiteFilterMode == WebsiteFilterMode.BLOCKLIST ||
+                uiState.websiteFilterMode == WebsiteFilterMode.COMBINED) {
+                SectionLabel("Blocked Websites")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = newBlockedWebsite,
+                        onValueChange = { newBlockedWebsite = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        placeholder = { Text("e.g. distracting-site.com") }
+                    )
+                    IconButton(
+                        onClick = {
+                            viewModel.addBlockedWebsite(newBlockedWebsite)
+                            newBlockedWebsite = ""
+                        },
+                        enabled = newBlockedWebsite.isNotBlank()
+                    ) {
+                        Icon(Icons.Outlined.Add, contentDescription = "Add blocked website", tint = BarrierRed)
+                    }
+                }
+                uiState.blockedWebsites.forEach { domain ->
+                    WebsiteChip(domain = domain, onRemove = { viewModel.removeBlockedWebsite(domain) })
+                }
+            }
             if (uiState.websiteFilterMode == WebsiteFilterMode.ALLOWLIST_ONLY ||
                 uiState.websiteFilterMode == WebsiteFilterMode.COMBINED) {
                 SectionLabel("Allowed Websites")
