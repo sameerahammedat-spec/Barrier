@@ -128,7 +128,7 @@ fun CreateSessionScreen(
             if (uiState.availableBlocklists.isNotEmpty()) {
                 SectionLabel("Blocklists")
                 Text(
-                    "Selected reusable app blocklists are enforced in addition to the App Blocking mode above.",
+                    "Selected reusable app blocklists are enforced in addition to the App Blocking mode above. A blocklist can still block an app that is in your allowlist.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -189,7 +189,7 @@ fun CreateSessionScreen(
                     WebsiteFilterMode.BLOCKLIST -> "Only websites listed below are blocked in supported browsers. App selection is configured separately."
                     WebsiteFilterMode.ALLOWLIST_ONLY -> "Only configured allowed websites are accessible in supported browsers."
                     WebsiteFilterMode.ADULT_PROTECTION -> "Apply Barrier's URL and accessible-text adult-content heuristics in supported browsers."
-                    WebsiteFilterMode.COMBINED -> "Apply both configured website block rules and website allowlist rules."
+                    WebsiteFilterMode.COMBINED -> "Apply both website block and allowlist rules. If a domain appears in both lists, the block rule wins."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
