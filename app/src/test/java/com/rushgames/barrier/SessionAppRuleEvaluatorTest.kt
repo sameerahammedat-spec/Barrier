@@ -54,5 +54,6 @@ class SessionAppRuleEvaluatorTest {
         assertFalse(SessionAppRuleEvaluator.shouldBlock("com.rushgames.barrier", rules, "com.rushgames.barrier"))
         assertFalse(SessionAppRuleEvaluator.shouldBlock("com.android.settings", rules, "com.rushgames.barrier"))
         assertFalse(SessionAppRuleEvaluator.shouldBlock("com.android.systemui", rules, "com.rushgames.barrier"))
+        assertFalse(SessionAppRuleEvaluator.shouldBlock("com.android.phone", rules, "com.rushgames.barrier"))
     }
 }
