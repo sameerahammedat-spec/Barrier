@@ -12,6 +12,8 @@ import com.rushgames.barrier.MainActivity
 import com.rushgames.barrier.data.dao.StatsDao
 import com.rushgames.barrier.data.datastore.BarrierPreferences
 import com.rushgames.barrier.data.model.AttemptType
+import com.rushgames.barrier.data.model.AppFilterMode
+import com.rushgames.barrier.data.model.SessionAppRuleEvaluator
 import com.rushgames.barrier.data.model.BlockedAttempt
 import com.rushgames.barrier.data.model.KnownBrowsers
 import com.rushgames.barrier.data.model.SessionStatus
@@ -176,15 +178,15 @@ class BlockingService : Service() {
             pm.getApplicationLabel(appInfo).toString()
         }.getOrDefault(foregroundPackage)
 
-        // 1. Session Allowlist Check
-        // Empty app selections mean no app blocking, as stated in the session setup UI.
-        val isAllowlistMode = activeSession.allowedAppPackages.isNotEmpty()
-
-        if (isAllowlistMode) {
-            if (!activeSession.allowedAppPackages.contains(foregroundPackage)) {
-                triggerBlock(foregroundPackage, appLabel, "Allowed-Apps-Only Session: '${activeSession.name}'", activeSession.id)
-                return
+        // Use the same pure rule evaluator as the Accessibility enforcement path.
+        if (SessionAppRuleEvaluator.shouldBlock(foregroundPackage, activeSession, packageName)) {
+            val reason = when (activeSession.appFilterMode) {
+                AppFilterMode.BLOCK_SELECTED -> "Selected app blocked during session '${activeSession.name}'"
+                AppFilterMode.ALLOWLIST_ONLY -> "App is not in the session allowlist '${activeSession.name}'"
+                AppFilterMode.NONE -> "App blocked by session rule"
             }
+            triggerBlock(foregroundPackage, appLabel, reason, activeSession.id)
+            return
         }
 
         // 2. Unapproved Browser Check
