@@ -123,12 +123,21 @@ class CreateSessionViewModel @Inject constructor(
     fun createSession(onSuccess: () -> Unit) = viewModelScope.launch {
         _uiState.update { it.copy(isSaving = true, saveError = null) }
         val s = _uiState.value
-        val durationMin = s.durationHours * 60 + s.durationMinutes
+        val durationMin = SessionDurationPolicy.toMinutes(s.durationHours, s.durationMinutes)
+        if (!SessionDurationPolicy.isValid(durationMin)) {
+            _uiState.update {
+                it.copy(
+                    isSaving = false,
+                    saveError = "Choose a session duration between 5 minutes and 7 days."
+                )
+            }
+            return@launch
+        }
         val now = System.currentTimeMillis()
-        val durationMs = maxOf(1, durationMin) * 60_000L
+        val durationMs = durationMin * 60_000L
         val session = Session(
             name = s.name,
-            durationMinutes = maxOf(1, durationMin),
+            durationMinutes = durationMin,
             startTime = now,
             endTime = now + durationMs,
             status = SessionStatus.IDLE,
