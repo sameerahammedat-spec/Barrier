@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rushgames.barrier.data.model.SessionBreakSettings
+import com.rushgames.barrier.data.model.SessionDurationPolicy
 import com.rushgames.barrier.data.model.WebsiteFilterMode
 import com.rushgames.barrier.ui.theme.BarrierGreen
 import com.rushgames.barrier.ui.theme.BarrierPurple
@@ -59,7 +60,7 @@ fun CreateSessionScreen(
                     Button(
                         onClick = { viewModel.createSession(onSessionCreated) },
                         modifier = Modifier.weight(2f),
-                        enabled = !uiState.isSaving && (uiState.durationHours > 0 || uiState.durationMinutes > 0),
+                        enabled = !uiState.isSaving && SessionDurationPolicy.isValid(SessionDurationPolicy.toMinutes(uiState.durationHours, uiState.durationMinutes)),
                         colors = ButtonDefaults.buttonColors(containerColor = BarrierGreen),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -240,45 +241,88 @@ private fun SectionLabel(text: String) {
     )
 }
 
+private enum class DurationUnit { MINUTES, HOURS, DAYS }
+
 @Composable
 private fun DurationPicker(hours: Int, minutes: Int, onDurationChange: (Int, Int) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        listOf(
-            Pair(1, "Quick · 25m") to { onDurationChange(0, 25) },
-            Pair(2, "1 hour") to { onDurationChange(1, 0) },
-            Pair(3, "2 hours") to { onDurationChange(2, 0) },
-            Pair(4, "3 hours") to { onDurationChange(3, 0) }
-        ).forEach { (labelPair, action) ->
-            val (_, label) = labelPair
-            val durationH = when (label) {
-                "Quick · 25m" -> 0; "1 hour" -> 1; "2 hours" -> 2; else -> 3
-            }
-            val durationM = when (label) { "Quick · 25m" -> 25; else -> 0 }
-            val isSelected = hours == durationH && minutes == durationM
-            FilterChip(
-                selected = isSelected,
-                onClick = action,
-                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = BarrierGreen.copy(alpha = 0.15f),
-                    selectedLabelColor = BarrierGreen
-                )
-            )
-        }
+    var unit by remember { mutableStateOf(DurationUnit.HOURS) }
+    val totalMinutes = SessionDurationPolicy.toMinutes(hours, minutes)
+    val amount = when (unit) {
+        DurationUnit.MINUTES -> totalMinutes.coerceIn(5, 59)
+        DurationUnit.HOURS -> ((totalMinutes + 59) / 60).coerceIn(1, 168)
+        DurationUnit.DAYS -> ((totalMinutes + 1_439) / 1_440).coerceIn(1, 7)
     }
-    Spacer(Modifier.height(8.dp))
-    // Custom duration sliders
-    Text("Custom: ${hours}h ${minutes}m", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Slider(
-        value = hours.toFloat(),
-        onValueChange = { onDurationChange(it.toInt(), minutes) },
-        valueRange = 0f..12f,
-        steps = 11,
-        colors = SliderDefaults.colors(thumbColor = BarrierPurple, activeTrackColor = BarrierPurple)
-    )
+    val range = when (unit) {
+        DurationUnit.MINUTES -> 5f..59f
+        DurationUnit.HOURS -> 1f..168f
+        DurationUnit.DAYS -> 1f..7f
+    }
+    val steps = when (unit) {
+        DurationUnit.MINUTES -> 53
+        DurationUnit.HOURS -> 166
+        DurationUnit.DAYS -> 5
+    }
+    val durationLabel = when {
+        totalMinutes < 60 -> totalMinutes.toString() + " minutes"
+        totalMinutes % 1_440 == 0 -> (totalMinutes / 1_440).toString() + " days"
+        totalMinutes % 60 == 0 -> (totalMinutes / 60).toString() + " hours"
+        else -> (totalMinutes / 60).toString() + "h " + (totalMinutes % 60).toString() + "m"
+    }
+    val estimatedEnd = java.text.SimpleDateFormat("EEE, h:mm a", java.util.Locale.getDefault())
+        .format(java.util.Date(System.currentTimeMillis() + totalMinutes.coerceAtLeast(0) * 60_000L))
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(DurationUnit.MINUTES to "Minutes", DurationUnit.HOURS to "Hours", DurationUnit.DAYS to "Days").forEach { (option, label) ->
+                FilterChip(
+                    selected = unit == option,
+                    onClick = {
+                        unit = option
+                        val nextTotal = when (option) {
+                            DurationUnit.MINUTES -> totalMinutes.coerceIn(5, 59)
+                            DurationUnit.HOURS -> ((totalMinutes + 59) / 60).coerceIn(1, 168) * 60
+                            DurationUnit.DAYS -> ((totalMinutes + 1_439) / 1_440).coerceIn(1, 7) * 1_440
+                        }
+                        onDurationChange(nextTotal / 60, nextTotal % 60)
+                    },
+                    label = { Text(label) }
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(Triple(0, 25, "Quick · 25m"), Triple(1, 0, "1 hour"), Triple(2, 0, "2 hours"), Triple(3, 0, "3 hours")).forEach { (presetHours, presetMinutes, label) ->
+                FilterChip(
+                    selected = hours == presetHours && minutes == presetMinutes,
+                    onClick = {
+                        onDurationChange(presetHours, presetMinutes)
+                        unit = if (presetHours == 0) DurationUnit.MINUTES else DurationUnit.HOURS
+                    },
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                )
+            }
+        }
+        Text("Custom duration: " + durationLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        Slider(
+            value = amount.toFloat(),
+            onValueChange = { raw ->
+                val selected = raw.toInt()
+                val nextTotal = when (unit) {
+                    DurationUnit.MINUTES -> selected
+                    DurationUnit.HOURS -> selected * 60
+                    DurationUnit.DAYS -> selected * 1_440
+                }
+                onDurationChange(nextTotal / 60, nextTotal % 60)
+            },
+            valueRange = range,
+            steps = steps,
+            colors = SliderDefaults.colors(thumbColor = BarrierPurple, activeTrackColor = BarrierPurple)
+        )
+        Text(
+            "Estimated end: " + estimatedEnd + " · Minimum 5 minutes · Maximum 7 days",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 @Composable
