@@ -22,8 +22,10 @@ data class CreateSessionUiState(
     val isStrictMode: Boolean = false,
     val blockAdultContent: Boolean = false,
     val websiteFilterMode: WebsiteFilterMode = WebsiteFilterMode.BLOCKLIST,
+    val appFilterMode: AppFilterMode = AppFilterMode.NONE,
     val selectedBlocklistIds: List<Long> = emptyList(),
     val allowedApps: List<String> = emptyList(),
+    val blockedApps: List<String> = emptyList(),
     val allowedWebsites: List<String> = emptyList(),
     val blockedWebsites: List<String> = emptyList(),
     val breakSettings: SessionBreakSettings = SessionBreakSettings(),
@@ -66,6 +68,19 @@ class CreateSessionViewModel @Inject constructor(
             val intent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
                 addCategory(android.content.Intent.CATEGORY_LAUNCHER)
             }
+            val protectedPackages = setOf(
+                context.packageName,
+                "android",
+                "com.android.systemui",
+                "com.android.settings",
+                "com.android.permissioncontroller",
+                "com.google.android.permissioncontroller",
+                "com.android.packageinstaller",
+                "com.google.android.packageinstaller",
+                "com.android.launcher",
+                "com.android.launcher3",
+                "com.google.android.apps.nexuslauncher"
+            )
             val apps = pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
                 .map { ri ->
                     AppInfo(
@@ -76,6 +91,7 @@ class CreateSessionViewModel @Inject constructor(
                         isBrowser = KnownBrowsers.ALL_KNOWN_BROWSERS.contains(ri.activityInfo.packageName)
                     )
                 }
+                .filterNot { it.activityInfo.packageName in protectedPackages }
                 .sortedBy { it.appName }
                 .distinctBy { it.packageName }
             _uiState.update { it.copy(installedApps = apps) }
@@ -91,11 +107,18 @@ class CreateSessionViewModel @Inject constructor(
     }
     fun toggleAdultContent() = _uiState.update { it.copy(blockAdultContent = !it.blockAdultContent) }
     fun setWebsiteFilterMode(mode: WebsiteFilterMode) = _uiState.update { it.copy(websiteFilterMode = mode) }
+    fun setAppFilterMode(mode: AppFilterMode) = _uiState.update { it.copy(appFilterMode = mode) }
 
     fun toggleBlocklist(id: Long) = _uiState.update { state ->
         val current = state.selectedBlocklistIds.toMutableList()
         if (current.contains(id)) current.remove(id) else current.add(id)
         state.copy(selectedBlocklistIds = current)
+    }
+
+    fun toggleBlockedApp(packageName: String) = _uiState.update { state ->
+        val current = state.blockedApps.toMutableList()
+        if (current.contains(packageName)) current.remove(packageName) else current.add(packageName)
+        state.copy(blockedApps = current)
     }
 
     fun toggleAllowedApp(packageName: String) = _uiState.update { state ->
@@ -123,6 +146,19 @@ class CreateSessionViewModel @Inject constructor(
     fun createSession(onSuccess: () -> Unit) = viewModelScope.launch {
         _uiState.update { it.copy(isSaving = true, saveError = null) }
         val s = _uiState.value
+        if (s.appFilterMode == AppFilterMode.BLOCK_SELECTED && s.blockedApps.isEmpty()) {
+            _uiState.update {
+                it.copy(isSaving = false, saveError = "Select at least one app to block, or turn app blocking off.")
+            }
+            return@launch
+        }
+        if (s.appFilterMode == AppFilterMode.ALLOWLIST_ONLY && s.allowedApps.isEmpty()) {
+            _uiState.update {
+                it.copy(isSaving = false, saveError = "Select at least one allowed app to use Allowlist Only mode.")
+            }
+            return@launch
+        }
+
         val durationMin = SessionDurationPolicy.toMinutes(s.durationHours, s.durationMinutes)
         if (!SessionDurationPolicy.isValid(durationMin)) {
             _uiState.update {
@@ -144,8 +180,10 @@ class CreateSessionViewModel @Inject constructor(
             isLocked = s.isLocked || s.isStrictMode,
             isStrictMode = s.isStrictMode,
             websiteFilterMode = s.websiteFilterMode,
+            appFilterMode = s.appFilterMode,
             blocklistIds = s.selectedBlocklistIds.map { it.toString() },
             allowedAppPackages = s.allowedApps,
+            blockedAppPackages = s.blockedApps,
             allowedWebsites = s.allowedWebsites,
             blockedWebsites = s.blockedWebsites,
             breakSettings = s.breakSettings,
