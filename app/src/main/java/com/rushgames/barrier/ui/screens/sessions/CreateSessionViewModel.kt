@@ -68,19 +68,6 @@ class CreateSessionViewModel @Inject constructor(
             val intent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
                 addCategory(android.content.Intent.CATEGORY_LAUNCHER)
             }
-            val protectedPackages = setOf(
-                context.packageName,
-                "android",
-                "com.android.systemui",
-                "com.android.settings",
-                "com.android.permissioncontroller",
-                "com.google.android.permissioncontroller",
-                "com.android.packageinstaller",
-                "com.google.android.packageinstaller",
-                "com.android.launcher",
-                "com.android.launcher3",
-                "com.google.android.apps.nexuslauncher"
-            )
             val apps = pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
                 .map { ri ->
                     AppInfo(
@@ -91,7 +78,7 @@ class CreateSessionViewModel @Inject constructor(
                         isBrowser = KnownBrowsers.ALL_KNOWN_BROWSERS.contains(ri.activityInfo.packageName)
                     )
                 }
-                .filterNot { it.activityInfo.packageName in protectedPackages }
+                .filterNot { SessionAppRuleEvaluator.isProtectedPackage(it.activityInfo.packageName, context.packageName) }
                 .sortedBy { it.appName }
                 .distinctBy { it.packageName }
             _uiState.update { it.copy(installedApps = apps) }
