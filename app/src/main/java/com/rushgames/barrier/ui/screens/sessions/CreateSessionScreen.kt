@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rushgames.barrier.data.model.SessionBreakSettings
+import com.rushgames.barrier.data.model.AppFilterMode
 import com.rushgames.barrier.data.model.SessionDurationPolicy
 import com.rushgames.barrier.data.model.WebsiteFilterMode
 import com.rushgames.barrier.ui.theme.BarrierGreen
@@ -130,24 +131,39 @@ fun CreateSessionScreen(
                 }
             }
 
-            // Allowed Apps (Session Allowlist)
-            SectionLabel("Apps Allowed in Session")
+            // App rules are independent of website filtering.
+            SectionLabel("App Blocking")
+            AppFilterModeSelector(
+                selected = uiState.appFilterMode,
+                onSelect = viewModel::setAppFilterMode
+            )
             Text(
-                text = "Only these apps will be accessible during the session (leave empty to block nothing).",
+                text = when (uiState.appFilterMode) {
+                    AppFilterMode.NONE -> "App blocking is off. Your installed apps remain available, subject to other enabled rules."
+                    AppFilterMode.BLOCK_SELECTED -> "Only the apps you select below are blocked during this session."
+                    AppFilterMode.ALLOWLIST_ONLY -> "Only the apps you select below remain accessible. Other supported launchable apps are blocked."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            OutlinedButton(
-                onClick = { showAppPicker = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Outlined.Apps, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    if (uiState.allowedApps.isEmpty()) "Select Allowed Apps"
-                    else "${uiState.allowedApps.size} app${if (uiState.allowedApps.size > 1) "s" else ""} selected"
-                )
+            if (uiState.appFilterMode != AppFilterMode.NONE) {
+                val isBlockMode = uiState.appFilterMode == AppFilterMode.BLOCK_SELECTED
+                val selectedCount = if (isBlockMode) uiState.blockedApps.size else uiState.allowedApps.size
+                OutlinedButton(
+                    onClick = { showAppPicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Outlined.Apps, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (selectedCount == 0) {
+                            if (isBlockMode) "Choose Apps to Block" else "Choose Allowed Apps"
+                        } else {
+                            "$selectedCount app(s) selected"
+                        }
+                    )
+                }
             }
 
             // Website Allowlist
@@ -155,6 +171,16 @@ fun CreateSessionScreen(
             WebsiteFilterModeSelector(
                 selected = uiState.websiteFilterMode,
                 onSelect = viewModel::setWebsiteFilterMode
+            )
+            Text(
+                text = when (uiState.websiteFilterMode) {
+                    WebsiteFilterMode.BLOCKLIST -> "Apply the session's selected website block rules. This does not control app selection."
+                    WebsiteFilterMode.ALLOWLIST_ONLY -> "Only configured allowed websites are accessible in supported browsers."
+                    WebsiteFilterMode.ADULT_PROTECTION -> "Apply Barrier's URL and accessible-text adult-content heuristics in supported browsers."
+                    WebsiteFilterMode.COMBINED -> "Apply both configured website block rules and website allowlist rules."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             if (uiState.websiteFilterMode == WebsiteFilterMode.ALLOWLIST_ONLY ||
@@ -222,10 +248,21 @@ fun CreateSessionScreen(
 
     // App picker bottom sheet
     if (showAppPicker) {
+        val blockMode = uiState.appFilterMode == AppFilterMode.BLOCK_SELECTED
+        val selectedApps = if (blockMode) uiState.blockedApps else uiState.allowedApps
         AppPickerSheet(
+            title = if (blockMode) "Choose Apps to Block" else "Choose Allowed Apps",
             installedApps = uiState.installedApps,
-            selectedApps = uiState.allowedApps,
-            onToggleApp = viewModel::toggleAllowedApp,
+            selectedApps = selectedApps,
+            onToggleApp = if (blockMode) viewModel::toggleBlockedApp else viewModel::toggleAllowedApp,
+            onSelectAll = {
+                if (blockMode) viewModel.setBlockedApps(uiState.installedApps.map { it.packageName })
+                else viewModel.setAllowedApps(uiState.installedApps.map { it.packageName })
+            },
+            onClearAll = {
+                if (blockMode) viewModel.setBlockedApps(emptyList())
+                else viewModel.setAllowedApps(emptyList())
+            },
             onDismiss = { showAppPicker = false }
         )
     }
@@ -356,10 +393,10 @@ private fun WebsiteFilterModeSelector(
     onSelect: (WebsiteFilterMode) -> Unit
 ) {
     val modes = listOf(
-        WebsiteFilterMode.BLOCKLIST to "Block Selected",
-        WebsiteFilterMode.ALLOWLIST_ONLY to "Allowlist Only",
+        WebsiteFilterMode.BLOCKLIST to "Blocklisted Sites",
+        WebsiteFilterMode.ALLOWLIST_ONLY to "Website Allowlist",
         WebsiteFilterMode.ADULT_PROTECTION to "Adult Protection",
-        WebsiteFilterMode.COMBINED to "Combined"
+        WebsiteFilterMode.COMBINED to "Combined Website Rules"
     )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
         modes.forEach { (mode, label) ->
@@ -453,18 +490,42 @@ private fun BreakSettingsRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppPickerSheet(
+    title: String,
     installedApps: List<com.rushgames.barrier.data.model.AppInfo>,
     selectedApps: List<String>,
     onToggleApp: (String) -> Unit,
+    onSelectAll: () -> Unit,
+    onClearAll: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var query by remember { mutableStateOf("") }
+    val visibleApps = installedApps.filter {
+        it.appName.contains(query, ignoreCase = true) ||
+            it.packageName.contains(query, ignoreCase = true)
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-            Text("Select Allowed Apps", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text("${selectedApps.size} selected", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(16.dp))
-            Column(modifier = Modifier.height(400.dp).verticalScroll(rememberScrollState())) {
-                installedApps.forEach { app ->
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("Search installed apps") },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) }
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                TextButton(onClick = onSelectAll) { Text("Select all") }
+                TextButton(onClick = onClearAll) { Text("Clear all") }
+            }
+            Column(modifier = Modifier.height(360.dp).verticalScroll(rememberScrollState())) {
+                visibleApps.forEach { app ->
                     val isSelected = selectedApps.contains(app.packageName)
                     Row(
                         modifier = Modifier
@@ -493,6 +554,9 @@ private fun AppPickerSheet(
                         )
                     }
                     Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                }
+                if (visibleApps.isEmpty()) {
+                    Text("No matching installed apps.", modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(16.dp))
