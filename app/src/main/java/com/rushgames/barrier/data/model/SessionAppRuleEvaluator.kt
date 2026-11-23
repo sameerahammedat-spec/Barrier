@@ -26,11 +26,22 @@ object SessionAppRuleEvaluator {
         "com.google.android.apps.messaging"
     )
 
-    fun isProtectedPackage(packageName: String, barrierPackageName: String): Boolean =
-        packageName == barrierPackageName || packageName in protectedSystemPackages
+    fun isProtectedPackage(
+        packageName: String,
+        barrierPackageName: String,
+        additionalProtectedPackages: Set<String> = emptySet()
+    ): Boolean =
+        packageName == barrierPackageName ||
+            packageName in protectedSystemPackages ||
+            packageName in additionalProtectedPackages
 
-    fun shouldBlock(packageName: String, session: Session, barrierPackageName: String): Boolean {
-        if (isProtectedPackage(packageName, barrierPackageName)) return false
+    fun shouldBlock(
+        packageName: String,
+        session: Session,
+        barrierPackageName: String,
+        additionalProtectedPackages: Set<String> = emptySet()
+    ): Boolean {
+        if (isProtectedPackage(packageName, barrierPackageName, additionalProtectedPackages)) return false
 
         return when (session.appFilterMode) {
             AppFilterMode.NONE -> false
