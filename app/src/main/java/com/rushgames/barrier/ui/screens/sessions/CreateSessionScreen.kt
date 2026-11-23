@@ -388,6 +388,34 @@ private fun BlocklistToggleRow(name: String, appCount: Int, selected: Boolean, o
 }
 
 @Composable
+private fun AppFilterModeSelector(
+    selected: AppFilterMode,
+    onSelect: (AppFilterMode) -> Unit
+) {
+    val modes = listOf(
+        AppFilterMode.NONE to "Off",
+        AppFilterMode.BLOCK_SELECTED to "Block selected",
+        AppFilterMode.ALLOWLIST_ONLY to "Allowlist only"
+    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.horizontalScroll(rememberScrollState())
+    ) {
+        modes.forEach { (mode, label) ->
+            FilterChip(
+                selected = selected == mode,
+                onClick = { onSelect(mode) },
+                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = BarrierGreen.copy(alpha = 0.15f),
+                    selectedLabelColor = BarrierGreen
+                )
+            )
+        }
+    }
+}
+
+@Composable
 private fun WebsiteFilterModeSelector(
     selected: WebsiteFilterMode,
     onSelect: (WebsiteFilterMode) -> Unit
