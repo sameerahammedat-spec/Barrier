@@ -42,6 +42,11 @@ abstract class BarrierDatabase : RoomDatabase() {
                 database.execSQL(
                     "ALTER TABLE sessions ADD COLUMN blockedAppPackages TEXT NOT NULL DEFAULT 'json:[]'"
                 )
+                // Preserve the old implicit allowlist behaviour for existing sessions.
+                database.execSQL(
+                    "UPDATE sessions SET appFilterMode = 'ALLOWLIST_ONLY' " +
+                        "WHERE allowedAppPackages != 'json:[]' AND allowedAppPackages != ''"
+                )
             }
         }
     }
