@@ -61,6 +61,23 @@ class ProtectionCenterUiStateTest {
     }
 
     @Test
+    fun sessionWithSelectedAppRulesCountsAsHavingRules() {
+        val session = Session(
+            name = "App focus",
+            durationMinutes = 30,
+            endTime = System.currentTimeMillis() + 60_000,
+            blockedAppPackages = listOf("com.example.social")
+        )
+        assertTrue(
+            ProtectionCenterUiState(
+                activeSession = session,
+                accessibilityEnabled = true,
+                accessibilityServiceConnected = true
+            ).sessionRulesEnforced
+        )
+    }
+
+    @Test
     fun sessionRulesAreNotReportedAsEnforcedWhenStoredSessionDataNeedsRecovery() {
         val activeSession = Session(
             name = "Focus",
