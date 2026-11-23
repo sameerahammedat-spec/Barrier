@@ -1,11 +1,14 @@
 package com.rushgames.barrier.ui.screens.today
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rushgames.barrier.data.dao.StatsDao
 import com.rushgames.barrier.data.model.Session
 import com.rushgames.barrier.data.model.SessionStatus
 import com.rushgames.barrier.data.repository.SessionRepository
+import com.rushgames.barrier.util.PermissionManager
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -25,6 +28,7 @@ data class TodayUiState(
 
 @HiltViewModel
 class TodayViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val sessionRepository: SessionRepository,
     private val statsDao: StatsDao
 ) : ViewModel() {
@@ -62,10 +66,19 @@ class TodayViewModel @Inject constructor(
         }
     }
 
-    fun updatePermissionStatus(usageStats: Boolean, accessibility: Boolean) {
-        _uiState.update { it.copy(
-            hasUsageStatsPermission = usageStats,
-            hasAccessibilityPermission = accessibility
-        )}
+    /** Refresh special-access state from Android whenever the Home screen resumes. */
+    fun refreshPermissionStatus() {
+        val usageStats = runCatching {
+            PermissionManager.hasUsageStatsPermission(context)
+        }.getOrDefault(false)
+        val accessibility = runCatching {
+            PermissionManager.hasAccessibilityPermission(context)
+        }.getOrDefault(false)
+        _uiState.update {
+            it.copy(
+                hasUsageStatsPermission = usageStats,
+                hasAccessibilityPermission = accessibility
+            )
+        }
     }
 }
