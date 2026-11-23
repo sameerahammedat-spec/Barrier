@@ -115,6 +115,10 @@ class CreateSessionViewModel @Inject constructor(
         state.copy(selectedBlocklistIds = current)
     }
 
+    fun setBlockedApps(packages: List<String>) = _uiState.update { it.copy(blockedApps = packages.distinct()) }
+
+    fun setAllowedApps(packages: List<String>) = _uiState.update { it.copy(allowedApps = packages.distinct()) }
+
     fun toggleBlockedApp(packageName: String) = _uiState.update { state ->
         val current = state.blockedApps.toMutableList()
         if (current.contains(packageName)) current.remove(packageName) else current.add(packageName)
