@@ -17,6 +17,7 @@ import com.rushgames.barrier.data.model.StoredDataRecoveryReporter
 import com.rushgames.barrier.data.model.WebsiteFilterMode
 import com.rushgames.barrier.data.repository.BlocklistRepository
 import com.rushgames.barrier.data.repository.SessionRepository
+import com.rushgames.barrier.util.ProtectedAppPackages
 import com.rushgames.barrier.filter.AdultContentFilter
 import com.rushgames.barrier.filter.Level1UrlFilter
 import com.rushgames.barrier.filter.WebsiteDomainMatcher
@@ -47,6 +48,9 @@ class BarrierAccessibilityService : AccessibilityService() {
     @Inject lateinit var statsDao: StatsDao
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val protectedPackages by lazy(LazyThreadSafetyMode.NONE) {
+        ProtectedAppPackages.resolve(applicationContext)
+    }
     private var lastBlockedPackage: String? = null
     private var lastBlockedTime: Long = 0
 
@@ -119,7 +123,7 @@ class BarrierAccessibilityService : AccessibilityService() {
             }.getOrDefault(packageName)
 
             // App rules are evaluated identically by both enforcement paths.
-            if (SessionAppRuleEvaluator.shouldBlock(packageName, activeSession, applicationContext.packageName)) {
+            if (SessionAppRuleEvaluator.shouldBlock(packageName, activeSession, applicationContext.packageName, protectedPackages)) {
                 val reason = when (activeSession.appFilterMode) {
                     AppFilterMode.BLOCK_SELECTED -> "Selected app blocked during session '${activeSession.name}'"
                     AppFilterMode.ALLOWLIST_ONLY -> "App is not in the session allowlist '${activeSession.name}'"
