@@ -120,6 +120,20 @@ class CreateSessionViewModel @Inject constructor(
         state.copy(allowedApps = current)
     }
 
+    fun addBlockedWebsite(domain: String) {
+        if (domain.isBlank()) return
+        val cleanDomain = com.rushgames.barrier.filter.WebsiteDomainMatcher.normalizeDomain(domain) ?: return
+        _uiState.update { state ->
+            val current = state.blockedWebsites.toMutableList()
+            if (!current.contains(cleanDomain)) current.add(cleanDomain)
+            state.copy(blockedWebsites = current)
+        }
+    }
+
+    fun removeBlockedWebsite(domain: String) = _uiState.update { state ->
+        state.copy(blockedWebsites = state.blockedWebsites.filter { it != domain })
+    }
+
     fun addAllowedWebsite(domain: String) {
         if (domain.isBlank()) return
         val cleanDomain = com.rushgames.barrier.filter.WebsiteDomainMatcher.normalizeDomain(domain) ?: return
