@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rushgames.barrier.data.model.Session
+import com.rushgames.barrier.data.model.AppFilterMode
 import com.rushgames.barrier.data.model.SessionStatus
 import com.rushgames.barrier.ui.components.*
 import com.rushgames.barrier.ui.theme.BarrierGreen
@@ -173,6 +174,11 @@ private fun SessionCard(
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     SessionInfoChip(Icons.Outlined.Timer, "${session.durationMinutes}m")
+                    when (session.appFilterMode) {
+                        AppFilterMode.BLOCK_SELECTED -> SessionInfoChip(Icons.Outlined.Block, "${session.blockedAppPackages.size} blocked")
+                        AppFilterMode.ALLOWLIST_ONLY -> SessionInfoChip(Icons.Outlined.Apps, "${session.allowedAppPackages.size} allowed")
+                        AppFilterMode.NONE -> Unit
+                    }
                     if (session.blocklistIds.isNotEmpty()) {
                         SessionInfoChip(Icons.Outlined.Block, "${session.blocklistIds.size} list${if (session.blocklistIds.size > 1) "s" else ""}")
                     }
