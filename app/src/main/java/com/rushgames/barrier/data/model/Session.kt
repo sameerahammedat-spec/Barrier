@@ -1,5 +1,6 @@
 package com.rushgames.barrier.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
@@ -72,8 +73,8 @@ data class Session(
     val blockAdultContent: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     // App rules are independent from website filtering rules.
-    val appFilterMode: AppFilterMode = AppFilterMode.NONE,
-    val blockedAppPackages: List<String> = emptyList()
+    @ColumnInfo(defaultValue = "'NONE'") val appFilterMode: AppFilterMode = AppFilterMode.NONE,
+    @ColumnInfo(defaultValue = "'json:[]'") val blockedAppPackages: List<String> = emptyList()
 ) {
     val preventsCancellation: Boolean
         get() = isLocked || isStrictMode
