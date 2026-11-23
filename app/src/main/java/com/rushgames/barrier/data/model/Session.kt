@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json
 enum class SessionStatus { IDLE, ACTIVE, PAUSED, COMPLETED, CANCELLED }
 enum class SessionScheduleType { MANUAL, SCHEDULED, RECURRING }
 enum class WebsiteFilterMode { BLOCKLIST, ALLOWLIST_ONLY, ADULT_PROTECTION, COMBINED }
+enum class AppFilterMode { NONE, BLOCK_SELECTED, ALLOWLIST_ONLY }
 
 @Serializable
 data class SessionBreakSettings(
@@ -69,7 +70,10 @@ data class Session(
     val blockedWebsites: List<String> = emptyList(),
     val breakSettings: SessionBreakSettings = SessionBreakSettings(),
     val blockAdultContent: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    // App rules are independent from website filtering rules.
+    val appFilterMode: AppFilterMode = AppFilterMode.NONE,
+    val blockedAppPackages: List<String> = emptyList()
 ) {
     val preventsCancellation: Boolean
         get() = isLocked || isStrictMode
