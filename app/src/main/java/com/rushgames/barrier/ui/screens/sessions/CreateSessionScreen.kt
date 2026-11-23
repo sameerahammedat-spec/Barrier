@@ -8,6 +8,8 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -515,6 +517,33 @@ private fun BreakSettingsRow(
     }
 }
 
+@Composable
+private fun InstalledAppIcon(
+    app: com.rushgames.barrier.data.model.AppInfo,
+    selected: Boolean
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val icon = remember(app.packageName) {
+        runCatching {
+            context.packageManager.getApplicationIcon(app.packageName).toBitmap(96, 96).asImageBitmap()
+        }.getOrNull()
+    }
+    if (icon != null) {
+        androidx.compose.foundation.Image(
+            bitmap = icon,
+            contentDescription = app.appName,
+            modifier = Modifier.size(40.dp)
+        )
+    } else {
+        Icon(
+            if (app.isBrowser) Icons.Outlined.Language else Icons.Outlined.Apps,
+            contentDescription = app.appName,
+            modifier = Modifier.size(40.dp),
+            tint = if (selected) BarrierGreen else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppPickerSheet(
@@ -564,12 +593,7 @@ private fun AppPickerSheet(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(
-                                if (app.isBrowser) Icons.Outlined.Language else Icons.Outlined.Apps,
-                                contentDescription = null,
-                                modifier = Modifier.size(22.dp),
-                                tint = if (isSelected) BarrierGreen else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            InstalledAppIcon(app = app, selected = isSelected)
                             Column {
                                 Text(app.appName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                                 Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
