@@ -127,6 +127,11 @@ fun CreateSessionScreen(
             // Blocklists
             if (uiState.availableBlocklists.isNotEmpty()) {
                 SectionLabel("Blocklists")
+                Text(
+                    "Selected reusable app blocklists are enforced in addition to the App Blocking mode above.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 uiState.availableBlocklists.forEach { bl ->
                     val selected = uiState.selectedBlocklistIds.contains(bl.id)
                     BlocklistToggleRow(
