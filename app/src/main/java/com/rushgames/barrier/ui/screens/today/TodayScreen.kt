@@ -21,6 +21,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rushgames.barrier.data.model.Session
+import com.rushgames.barrier.data.model.AppFilterMode
 import com.rushgames.barrier.data.model.SessionStatus
 import com.rushgames.barrier.ui.components.*
 import com.rushgames.barrier.ui.theme.BarrierGreen
@@ -195,6 +196,25 @@ private fun ActiveSessionCard(session: Session) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                when (session.appFilterMode) {
+                    AppFilterMode.BLOCK_SELECTED -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "${session.blockedAppPackages.size} apps selected to block",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BarrierGreen
+                        )
+                    }
+                    AppFilterMode.ALLOWLIST_ONLY -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "${session.allowedAppPackages.size} allowed apps",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BarrierGreen
+                        )
+                    }
+                    AppFilterMode.NONE -> Unit
+                }
                 if (session.blocklistIds.isNotEmpty()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
