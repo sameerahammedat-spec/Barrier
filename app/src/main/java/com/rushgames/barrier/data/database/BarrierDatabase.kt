@@ -1,6 +1,8 @@
 package com.rushgames.barrier.data.database
 
 import androidx.room.Database
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.rushgames.barrier.data.dao.BlocklistDao
@@ -19,7 +21,7 @@ import com.rushgames.barrier.data.model.*
         FocusStats::class,
         AppUsageLimit::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(StringListConverter::class, BreakSettingsConverter::class)
@@ -31,5 +33,16 @@ abstract class BarrierDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "barrier.db"
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE sessions ADD COLUMN appFilterMode TEXT NOT NULL DEFAULT 'NONE'"
+                )
+                database.execSQL(
+                    "ALTER TABLE sessions ADD COLUMN blockedAppPackages TEXT NOT NULL DEFAULT 'json:[]'"
+                )
+            }
+        }
     }
 }
