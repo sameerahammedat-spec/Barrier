@@ -78,7 +78,7 @@ class CreateSessionViewModel @Inject constructor(
                         isBrowser = KnownBrowsers.ALL_KNOWN_BROWSERS.contains(ri.activityInfo.packageName)
                     )
                 }
-                .filterNot { SessionAppRuleEvaluator.isProtectedPackage(it.activityInfo.packageName, context.packageName) }
+                .filterNot { SessionAppRuleEvaluator.isProtectedPackage(it.packageName, context.packageName) }
                 .sortedBy { it.appName }
                 .distinctBy { it.packageName }
             _uiState.update { it.copy(installedApps = apps) }
