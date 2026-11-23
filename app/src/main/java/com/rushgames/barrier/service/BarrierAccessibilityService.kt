@@ -11,6 +11,8 @@ import com.rushgames.barrier.data.model.AttemptType
 import com.rushgames.barrier.data.model.BlockedAttempt
 import com.rushgames.barrier.data.model.KnownBrowsers
 import com.rushgames.barrier.data.model.SessionStatus
+import com.rushgames.barrier.data.model.AppFilterMode
+import com.rushgames.barrier.data.model.SessionAppRuleEvaluator
 import com.rushgames.barrier.data.model.StoredDataRecoveryReporter
 import com.rushgames.barrier.data.model.WebsiteFilterMode
 import com.rushgames.barrier.data.repository.BlocklistRepository
@@ -116,15 +118,15 @@ class BarrierAccessibilityService : AccessibilityService() {
                 pm.getApplicationLabel(appInfo).toString()
             }.getOrDefault(packageName)
 
-            // 1. Session-based Allowlist Mode (Feature Set C)
-            // Empty app selections mean no app blocking, as stated in the session setup UI.
-            val isAllowlistMode = activeSession.allowedAppPackages.isNotEmpty()
-
-            if (isAllowlistMode) {
-                if (!activeSession.allowedAppPackages.contains(packageName)) {
-                    blockApp(packageName, appLabel, "Allowed-Apps-Only Session: '${activeSession.name}'", activeSession.id)
-                    return@launch
+            // App rules are evaluated identically by both enforcement paths.
+            if (SessionAppRuleEvaluator.shouldBlock(packageName, activeSession, applicationContext.packageName)) {
+                val reason = when (activeSession.appFilterMode) {
+                    AppFilterMode.BLOCK_SELECTED -> "Selected app blocked during session '${activeSession.name}'"
+                    AppFilterMode.ALLOWLIST_ONLY -> "App is not in the session allowlist '${activeSession.name}'"
+                    AppFilterMode.NONE -> "App blocked by session rule"
                 }
+                blockApp(packageName, appLabel, reason, activeSession.id)
+                return@launch
             }
 
             // 2. Browser Allowlisting / Unsupported Browser Blocking (Feature Set D)
