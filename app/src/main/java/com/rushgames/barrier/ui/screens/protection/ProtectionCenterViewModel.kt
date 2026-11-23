@@ -30,6 +30,8 @@ data class ProtectionCenterUiState(
     val sessionHasRules: Boolean
         get() = activeSession?.let { session ->
             session.allowedAppPackages.isNotEmpty() ||
+                session.blockedAppPackages.isNotEmpty() ||
+                session.appFilterMode != com.rushgames.barrier.data.model.AppFilterMode.NONE ||
                 session.blocklistIds.isNotEmpty() ||
                 session.blockedWebsites.isNotEmpty() ||
                 session.allowedWebsites.isNotEmpty() ||
