@@ -220,7 +220,7 @@ fun CreateSessionScreen(
             OptionToggleRow(
                 icon = Icons.Outlined.Lock,
                 title = "Locked Mode",
-                description = "Blocks in-app cancellation; Android can still stop or uninstall Barrier.",
+                description = "Prevents canceling this active session inside Barrier. Android can still force-stop or uninstall the app.",
                 checked = uiState.isLocked,
                 onToggle = viewModel::toggleLocked
             )
@@ -228,7 +228,7 @@ fun CreateSessionScreen(
             OptionToggleRow(
                 icon = Icons.Outlined.Security,
                 title = "Strict Mode",
-                description = "Locks this session in Barrier until it expires; Android can still stop or uninstall the app.",
+                description = "Marks this as a strict session and prevents in-app cancellation. It is enabled by default when the global Strict Mode setting is on; Android can still stop or uninstall Barrier.",
                 checked = uiState.isStrictMode,
                 onToggle = viewModel::toggleStrictMode
             )
@@ -236,7 +236,7 @@ fun CreateSessionScreen(
             OptionToggleRow(
                 icon = Icons.Outlined.Block,
                 title = "Block Adult Content",
-                description = "Enable adult content filter during session",
+                description = "Checks URLs and accessible text in supported browsers using heuristics. Coverage is limited and it can miss content; this is not system-wide filtering.",
                 checked = uiState.blockAdultContent,
                 onToggle = viewModel::toggleAdultContent
             )
