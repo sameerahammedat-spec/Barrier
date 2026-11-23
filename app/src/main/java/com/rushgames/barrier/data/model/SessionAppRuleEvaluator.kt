@@ -15,11 +15,22 @@ object SessionAppRuleEvaluator {
         "com.google.android.packageinstaller",
         "com.android.launcher",
         "com.android.launcher3",
-        "com.google.android.apps.nexuslauncher"
+        "com.google.android.apps.nexuslauncher",
+        "com.android.phone",
+        "com.android.dialer",
+        "com.google.android.dialer",
+        "com.android.contacts",
+        "com.google.android.contacts",
+        "com.android.emergency",
+        "com.android.mms",
+        "com.google.android.apps.messaging"
     )
 
+    fun isProtectedPackage(packageName: String, barrierPackageName: String): Boolean =
+        packageName == barrierPackageName || packageName in protectedSystemPackages
+
     fun shouldBlock(packageName: String, session: Session, barrierPackageName: String): Boolean {
-        if (packageName == barrierPackageName || packageName in protectedSystemPackages) return false
+        if (isProtectedPackage(packageName, barrierPackageName)) return false
 
         return when (session.appFilterMode) {
             AppFilterMode.NONE -> false
