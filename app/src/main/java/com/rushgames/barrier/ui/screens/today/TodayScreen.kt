@@ -135,8 +135,8 @@ fun TodayScreen(
         if (!uiState.hasAccessibilityPermission) {
             PermissionWarningCard(
                 icon = Icons.Outlined.Accessibility,
-                title = "Accessibility Service",
-                description = "Enable Barrier's Accessibility Service for stronger app blocking.",
+                title = "Browser Website Checks",
+                description = "Enable Accessibility only for URL and page-content checks in supported browsers. App blocking works separately through Usage Access.",
                 actionLabel = "Enable",
                 onClick = onNavigatePermissions
             )
