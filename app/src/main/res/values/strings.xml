@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Barrier</string>
-    <string name="accessibility_service_label">Barrier App Blocker</string>
-    <string name="accessibility_service_description">Barrier uses Accessibility Service to monitor foreground apps and enforce session-based blocking rules. No personal data or keystrokes are collected.</string>
+    <string name="accessibility_service_label">Barrier Browser Filter</string>
+    <string name="accessibility_service_description">Barrier uses Accessibility only for website checks in supported browsers. It reads the current page URL and accessible page content to apply your enabled website rules. App blocking uses Usage Access separately. Page content is processed on-device and is not sent to Barrier servers.</string>
 </resources>
