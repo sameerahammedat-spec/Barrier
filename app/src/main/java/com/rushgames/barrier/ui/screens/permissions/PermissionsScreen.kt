@@ -128,7 +128,7 @@ fun PermissionsScreen(
             item {
                 PermissionCard(
                     title = "Accessibility Service",
-                    description = "Can redirect some blocked app launches and inspect accessible content in supported browsers. This is not device-wide enforcement.",
+                    description = "Used only for website URL and accessible-page checks in supported browsers. App blocking uses Usage Access separately. Some banking apps warn whenever any Accessibility service is enabled. If your bank asks you to disable Barrier, turn it off in Android Accessibility settings before opening the bank app. Website checks pause; Usage Access app blocking can continue.",
                     icon = Icons.Default.AccessibilityNew,
                     isGranted = hasAccessibility,
                     onClick = { PermissionManager.openAccessibilitySettings(context) }
