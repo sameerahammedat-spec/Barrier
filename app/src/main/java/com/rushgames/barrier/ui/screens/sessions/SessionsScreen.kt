@@ -36,13 +36,17 @@ fun SessionsScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onCreateSession,
-                containerColor = BarrierGreen,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                icon = { Icon(Icons.Outlined.Add, "New Session") },
-                text = { Text("New Session", fontWeight = FontWeight.SemiBold) }
-            )
+            val hasSessions = uiState.activeSessions.isNotEmpty() ||
+                uiState.upcomingSessions.isNotEmpty() || uiState.history.isNotEmpty()
+            if (hasSessions) {
+                ExtendedFloatingActionButton(
+                    onClick = onCreateSession,
+                    containerColor = BarrierGreen,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = { Icon(Icons.Outlined.Add, "New Session") },
+                    text = { Text("New Session", fontWeight = FontWeight.SemiBold) }
+                )
+            }
         }
     ) { padding ->
         Column(
