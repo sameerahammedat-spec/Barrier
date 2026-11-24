@@ -23,6 +23,7 @@ import com.rushgames.barrier.data.model.SessionDurationPolicy
 import com.rushgames.barrier.data.model.WebsiteFilterMode
 import com.rushgames.barrier.ui.theme.BarrierGreen
 import com.rushgames.barrier.ui.theme.BarrierPurple
+import com.rushgames.barrier.ui.theme.BarrierRed
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
