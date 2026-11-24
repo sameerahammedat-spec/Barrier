@@ -1,6 +1,7 @@
 package com.rushgames.barrier.service
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -11,13 +12,9 @@ import com.rushgames.barrier.data.model.AttemptType
 import com.rushgames.barrier.data.model.BlockedAttempt
 import com.rushgames.barrier.data.model.KnownBrowsers
 import com.rushgames.barrier.data.model.SessionStatus
-import com.rushgames.barrier.data.model.AppFilterMode
-import com.rushgames.barrier.data.model.SessionAppRuleEvaluator
 import com.rushgames.barrier.data.model.StoredDataRecoveryReporter
 import com.rushgames.barrier.data.model.WebsiteFilterMode
-import com.rushgames.barrier.data.repository.BlocklistRepository
 import com.rushgames.barrier.data.repository.SessionRepository
-import com.rushgames.barrier.util.ProtectedAppPackages
 import com.rushgames.barrier.filter.AdultContentFilter
 import com.rushgames.barrier.filter.Level1UrlFilter
 import com.rushgames.barrier.filter.WebsiteDomainMatcher
@@ -44,16 +41,9 @@ class BarrierAccessibilityService : AccessibilityService() {
 
     @Inject lateinit var sessionRepository: SessionRepository
     @Inject lateinit var preferences: BarrierPreferences
-    @Inject lateinit var blocklistRepository: BlocklistRepository
     @Inject lateinit var statsDao: StatsDao
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val protectedPackages by lazy(LazyThreadSafetyMode.NONE) {
-        ProtectedAppPackages.resolve(applicationContext)
-    }
-    private var lastBlockedPackage: String? = null
-    private var lastBlockedTime: Long = 0
-
     private var lastInspectedUrl: String? = null
     private var lastUrlInspectTime: Long = 0
 
@@ -71,109 +61,24 @@ class BarrierAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+
+        // Least-privilege scope: Accessibility is used only for website checks
+        // in Barrier-supported browsers. App blocking is handled by Usage Access.
+        val scopedInfo = serviceInfo
+        scopedInfo.eventTypes = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+        scopedInfo.packageNames = KnownBrowsers.SUPPORTED_BROWSERS.toTypedArray()
+        scopedInfo.flags = 0
+        scopedInfo.notificationTimeout = 300
+        setServiceInfo(scopedInfo)
+
         mutableConnectionStatus.value = true
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null) return
-
-        when (event.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                val packageName = event.packageName?.toString() ?: return
-                handlePackageChange(packageName)
-            }
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
-                val packageName = event.packageName?.toString() ?: return
-                if (KnownBrowsers.ALL_KNOWN_BROWSERS.contains(packageName)) {
-                    inspectBrowserUrl(packageName)
-                }
-            }
-        }
-    }
-
-    private fun handlePackageChange(packageName: String) {
-        if (packageName == applicationContext.packageName) return
-        if (ignoredPackages.contains(packageName)) return
-
-        // Cooldown rate-limiting (1.5 seconds) per package to avoid launch loops
-        val now = System.currentTimeMillis()
-        if (packageName == lastBlockedPackage && (now - lastBlockedTime) < 1500) {
-            return
-        }
-
-        serviceScope.launch {
-            val activeSession = sessionRepository.getActiveSessionOnce() ?: return@launch
-            if (preferences.storageRecoveryNotice.first() != null || StoredDataRecoveryReporter.hasCorruption) {
-                Log.e("BarrierAccessibility", "Session rules paused because saved rule data is corrupt")
-                return@launch
-            }
-
-            // Check if active session is expired
-            if (now > activeSession.endTime) {
-                sessionRepository.completeSession(activeSession.id)
-                return@launch
-            }
-
-            if (activeSession.status != SessionStatus.ACTIVE) return@launch
-
-            val pm = packageManager
-            val appLabel = runCatching {
-                val appInfo = pm.getApplicationInfo(packageName, 0)
-                pm.getApplicationLabel(appInfo).toString()
-            }.getOrDefault(packageName)
-
-            // App rules are evaluated identically by both enforcement paths.
-            if (SessionAppRuleEvaluator.shouldBlock(packageName, activeSession, applicationContext.packageName, protectedPackages)) {
-                val reason = when (activeSession.appFilterMode) {
-                    AppFilterMode.BLOCK_SELECTED -> "Selected app blocked during session '${activeSession.name}'"
-                    AppFilterMode.ALLOWLIST_ONLY -> "App is not in the session allowlist '${activeSession.name}'"
-                    AppFilterMode.NONE -> "App blocked by session rule"
-                }
-                blockApp(packageName, appLabel, reason, activeSession.id)
-                return@launch
-            }
-
-            // 2. Browser Allowlisting / Unsupported Browser Blocking (Feature Set D)
-            if (KnownBrowsers.ALL_KNOWN_BROWSERS.contains(packageName)) {
-                val isSupported = KnownBrowsers.SUPPORTED_BROWSERS.contains(packageName)
-                if (!isSupported) {
-                    blockApp(packageName, appLabel, "Unsupported Browser strictly blocked during session", activeSession.id)
-                    return@launch
-                }
-            }
-
-            // 3. Blocklist Mode
-            val blocklistIds = activeSession.blocklistIds.mapNotNull { it.toLongOrNull() }
-            if (blocklistIds.isNotEmpty()) {
-                val blockedPackages = blocklistRepository.getBlockedPackageNamesForBlocklists(blocklistIds)
-                if (blockedPackages.contains(packageName)) {
-                    blockApp(packageName, appLabel, "Blocked by session blocklist ('${activeSession.name}')", activeSession.id)
-                    return@launch
-                }
-            }
-        }
-    }
-
-    private fun blockApp(packageName: String, appLabel: String, reason: String, sessionId: Long) {
-        lastBlockedPackage = packageName
-        lastBlockedTime = System.currentTimeMillis()
-
-        Log.d("BarrierAccessibility", "Blocking app: $packageName ($appLabel) - $reason")
-
-        // Record blocked attempt
-        serviceScope.launch {
-            statsDao.insertBlockedAttempt(
-                BlockedAttempt(
-                    sessionId = sessionId,
-                    type = AttemptType.APP,
-                    packageNameOrDomain = packageName,
-                    displayName = appLabel
-                )
-            )
-        }
-
-        // Launch restriction overlay screen
-        RestrictionActivity.start(applicationContext, appLabel, reason)
+        if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return
+        val packageName = event.packageName?.toString() ?: return
+        if (packageName !in KnownBrowsers.SUPPORTED_BROWSERS) return
+        inspectBrowserUrl(packageName)
     }
 
     private fun inspectBrowserUrl(packageName: String) {
@@ -249,9 +154,6 @@ class BarrierAccessibilityService : AccessibilityService() {
     }
 
     private fun blockWebsite(domain: String, reason: String, sessionId: Long?, browserPackage: String) {
-        lastBlockedPackage = browserPackage
-        lastBlockedTime = System.currentTimeMillis()
-
         Log.d("BarrierAccessibility", "Blocking website: $domain in $browserPackage - $reason")
 
         serviceScope.launch {
