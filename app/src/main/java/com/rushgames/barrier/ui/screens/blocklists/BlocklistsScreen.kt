@@ -35,13 +35,15 @@ fun BlocklistsScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onCreateBlocklist,
-                containerColor = BarrierGreen,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                icon = { Icon(Icons.Outlined.Add, "New Blocklist") },
-                text = { Text("New Blocklist", fontWeight = FontWeight.SemiBold) }
-            )
+            if (uiState.blocklists.isNotEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = onCreateBlocklist,
+                    containerColor = BarrierGreen,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = { Icon(Icons.Outlined.Add, "New Blocklist") },
+                    text = { Text("New Blocklist", fontWeight = FontWeight.SemiBold) }
+                )
+            }
         }
     ) { padding ->
         Column(
