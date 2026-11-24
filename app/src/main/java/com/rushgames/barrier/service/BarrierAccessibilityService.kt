@@ -46,18 +46,6 @@ class BarrierAccessibilityService : AccessibilityService() {
     private var lastInspectedUrl: String? = null
     private var lastUrlInspectTime: Long = 0
 
-    // Ignored system packages
-    private val ignoredPackages = setOf(
-        "com.android.systemui",
-        "com.google.android.permissioncontroller",
-        "com.android.settings",
-        "com.google.android.packageinstaller",
-        "android",
-        "com.android.launcher",
-        "com.android.launcher3",
-        "com.google.android.apps.nexuslauncher"
-    )
-
     override fun onServiceConnected() {
         super.onServiceConnected()
 
